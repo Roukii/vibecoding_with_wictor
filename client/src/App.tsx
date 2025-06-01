@@ -13,6 +13,7 @@ export type PrettyMessage = {
   id: bigint;
   sender: Identity;
   senderName: string;
+  senderAvatar: string | null;
   text: string;
   sent: Timestamp;
 };
@@ -79,9 +80,42 @@ function useUsers(conn: DbConnection | null): Map<string, User> {
   return users;
 }
 
+// Generate a deterministic avatar based on identity
+function generateAvatarUrl(identity: string): string {
+  // Using DiceBear API for generated avatars based on seed
+  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${identity}`;
+}
+
+function UserAvatar({ user, size = 32 }: { user: User | undefined, size?: number }) {
+  const avatarUrl = user?.avatarUrl || generateAvatarUrl(user?.identity.toHexString() || 'default');
+  const userName = user?.name || user?.identity.toHexString().substring(0, 8) || 'Unknown';
+
+  return (
+    <img
+      src={avatarUrl}
+      alt={`${userName}'s avatar`}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        objectFit: 'cover',
+        marginRight: '8px',
+        border: '2px solid #ddd'
+      }}
+      onError={(e) => {
+        // Fallback to generated avatar if custom avatar fails to load
+        const target = e.target as HTMLImageElement;
+        target.src = generateAvatarUrl(user?.identity.toHexString() || 'default');
+      }}
+    />
+  );
+}
+
 function App() {
   const [newName, setNewName] = useState('');
+  const [newAvatar, setNewAvatar] = useState('');
   const [settingName, setSettingName] = useState(false);
+  const [settingAvatar, setSettingAvatar] = useState(false);
   const [systemMessage, setSystemMessage] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [connected, setConnected] = useState<boolean>(false);
@@ -117,6 +151,10 @@ function App() {
 
       conn.reducers.onDeleteMessage(() => {
         console.log('Message deleted.');
+      });
+
+      conn.reducers.onSetAvatar(() => {
+        console.log('Avatar updated.');
       });
 
       subscribeToQueries(conn, ['SELECT * FROM message', 'SELECT * FROM user']);
@@ -167,15 +205,17 @@ function App() {
 
   const prettyMessages: PrettyMessage[] = messages
     .sort((a, b) => (a.sent > b.sent ? 1 : -1))
-    .map(message => ({
-      id: message.id,
-      sender: message.sender,
-      senderName:
-        users.get(message.sender.toHexString())?.name ||
-        message.sender.toHexString().substring(0, 8),
-      text: message.text,
-      sent: message.sent,
-    }));
+    .map(message => {
+      const user = users.get(message.sender.toHexString());
+      return {
+        id: message.id,
+        sender: message.sender,
+        senderName: user?.name || message.sender.toHexString().substring(0, 8),
+        senderAvatar: user?.avatarUrl || null,
+        text: message.text,
+        sent: message.sent,
+      };
+    });
 
   if (!conn || !connected || !identity) {
     return (
@@ -185,15 +225,19 @@ function App() {
     );
   }
 
-  const name =
-    users.get(identity?.toHexString())?.name ||
-    identity?.toHexString().substring(0, 8) ||
-    '';
+  const currentUser = users.get(identity?.toHexString());
+  const name = currentUser?.name || identity?.toHexString().substring(0, 8) || '';
 
   const onSubmitNewName = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSettingName(false);
     conn.reducers.setName(newName);
+  };
+
+  const onSubmitNewAvatar = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSettingAvatar(false);
+    conn.reducers.setAvatar(newAvatar);
   };
 
   const onMessageSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -229,9 +273,18 @@ function App() {
     <div className="App">
       <div className="profile">
         <h1>Profile</h1>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
+          <UserAvatar user={currentUser} size={64} />
+          <div>
+            <h3 style={{ margin: '0 0 5px 0' }}>{name}</h3>
+            <p style={{ margin: 0, fontSize: '0.8em', color: '#666' }}>
+              {identity?.toHexString().substring(0, 16)}...
+            </p>
+          </div>
+        </div>
+        
         {!settingName ? (
-          <>
-            <p>{name}</p>
+          <div style={{ marginBottom: '10px' }}>
             <button
               onClick={() => {
                 setSettingName(true);
@@ -240,71 +293,106 @@ function App() {
             >
               Edit Name
             </button>
-          </>
+          </div>
         ) : (
-          <form onSubmit={onSubmitNewName}>
+          <form onSubmit={onSubmitNewName} style={{ marginBottom: '10px' }}>
             <input
               type="text"
               aria-label="name input"
               value={newName}
               onChange={e => setNewName(e.target.value)}
+              placeholder="Enter your name"
             />
-            <button type="submit">Submit</button>
+            <button type="submit">Save Name</button>
+            <button type="button" onClick={() => setSettingName(false)}>Cancel</button>
+          </form>
+        )}
+
+        {!settingAvatar ? (
+          <div>
+            <button
+              onClick={() => {
+                setSettingAvatar(true);
+                setNewAvatar(currentUser?.avatarUrl || '');
+              }}
+            >
+              Edit Avatar
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={onSubmitNewAvatar}>
+            <input
+              type="url"
+              aria-label="avatar URL input"
+              value={newAvatar}
+              onChange={e => setNewAvatar(e.target.value)}
+              placeholder="Enter avatar URL (https://...)"
+            />
+            <button type="submit">Save Avatar</button>
+            <button type="button" onClick={() => setSettingAvatar(false)}>Cancel</button>
           </form>
         )}
       </div>
+
       <div className="message">
         <h1>Messages</h1>
         {prettyMessages.length < 1 && <p>No messages</p>}
         <div>
-          {prettyMessages.map((message) => (
-            <div key={message.id} style={{ 
-              border: '1px solid #ccc', 
-              margin: '10px 0', 
-              padding: '10px',
-              borderRadius: '5px',
-              position: 'relative'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ margin: '0 0 5px 0' }}>
-                    <b>{message.senderName}</b>
-                    <span style={{ fontSize: '0.8em', color: '#666', marginLeft: '10px' }}>
-                      {message.sent.toDate().toLocaleDateString()}
-                      
-                    </span>
-                  </p>
-                  <p style={{ margin: '0' }}>{message.text}</p>
+          {prettyMessages.map((message) => {
+            const messageUser = users.get(message.sender.toHexString());
+            return (
+              <div key={message.id} style={{ 
+                border: '1px solid #ccc', 
+                margin: '10px 0', 
+                padding: '10px',
+                borderRadius: '5px',
+                position: 'relative'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start' }}>
+                    <UserAvatar user={messageUser} size={40} />
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: '0 0 5px 0' }}>
+                        <b>{message.senderName}</b>
+                        <span style={{ fontSize: '0.8em', color: '#666', marginLeft: '10px' }}>
+                          {message.sent.toDate().toLocaleDateString()}
+                        </span>
+                      </p>
+                      <p style={{ margin: '0' }}>{message.text}</p>
+                    </div>
+                  </div>
+                  {isOwnMessage(message) && (
+                    <button
+                      onClick={() => onDeleteMessage(message.id)}
+                      disabled={deletingMessages.has(message.id)}
+                      style={{
+                        backgroundColor: '#ff4444',
+                        color: 'white',
+                        border: 'none',
+                        padding: '5px 10px',
+                        borderRadius: '3px',
+                        cursor: deletingMessages.has(message.id) ? 'not-allowed' : 'pointer',
+                        fontSize: '0.8em',
+                        marginLeft: '10px'
+                      }}
+                    >
+                      {deletingMessages.has(message.id) ? 'Deleting...' : 'Delete'}
+                    </button>
+                  )}
                 </div>
-                {isOwnMessage(message) && (
-                  <button
-                    onClick={() => onDeleteMessage(message.id)}
-                    disabled={deletingMessages.has(message.id)}
-                    style={{
-                      backgroundColor: '#ff4444',
-                      color: 'white',
-                      border: 'none',
-                      padding: '5px 10px',
-                      borderRadius: '3px',
-                      cursor: deletingMessages.has(message.id) ? 'not-allowed' : 'pointer',
-                      fontSize: '0.8em',
-                      marginLeft: '10px'
-                    }}
-                  >
-                    {deletingMessages.has(message.id) ? 'Deleting...' : 'Delete'}
-                  </button>
-                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
+
       <div className="system" style={{ whiteSpace: 'pre-wrap' }}>
         <h1>System</h1>
         <div>
           <p>{systemMessage}</p>
         </div>
       </div>
+
       <div className="new-message">
         <form
           onSubmit={onMessageSubmit}
