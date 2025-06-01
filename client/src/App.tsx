@@ -7,11 +7,14 @@ import {
   Message,
   User,
 } from './module_bindings';
-import { Identity } from '@clockworklabs/spacetimedb-sdk';
+import { Identity, Timestamp } from '@clockworklabs/spacetimedb-sdk';
 
 export type PrettyMessage = {
+  id: bigint;
+  sender: Identity;
   senderName: string;
   text: string;
+  sent: Timestamp;
 };
 
 function useMessages(conn: DbConnection | null): Message[] {
@@ -26,12 +29,7 @@ function useMessages(conn: DbConnection | null): Message[] {
 
     const onDelete = (_ctx: EventContext, message: Message) => {
       setMessages(prev =>
-        prev.filter(
-          m =>
-            m.text !== message.text &&
-            m.sent !== message.sent &&
-            m.sender !== message.sender
-        )
+        prev.filter(m => m.id !== message.id)
       );
     };
     conn.db.message.onDelete(onDelete);
@@ -89,6 +87,7 @@ function App() {
   const [connected, setConnected] = useState<boolean>(false);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [conn, setConn] = useState<DbConnection | null>(null);
+  const [deletingMessages, setDeletingMessages] = useState<Set<bigint>>(new Set());
 
   useEffect(() => {
     const subscribeToQueries = (conn: DbConnection, queries: string[]) => {
@@ -114,6 +113,10 @@ function App() {
       );
       conn.reducers.onSendMessage(() => {
         console.log('Message sent.');
+      });
+
+      conn.reducers.onDeleteMessage(() => {
+        console.log('Message deleted.');
       });
 
       subscribeToQueries(conn, ['SELECT * FROM message', 'SELECT * FROM user']);
@@ -165,10 +168,13 @@ function App() {
   const prettyMessages: PrettyMessage[] = messages
     .sort((a, b) => (a.sent > b.sent ? 1 : -1))
     .map(message => ({
+      id: message.id,
+      sender: message.sender,
       senderName:
         users.get(message.sender.toHexString())?.name ||
         message.sender.toHexString().substring(0, 8),
       text: message.text,
+      sent: message.sent,
     }));
 
   if (!conn || !connected || !identity) {
@@ -194,6 +200,29 @@ function App() {
     e.preventDefault();
     setNewMessage('');
     conn.reducers.sendMessage(newMessage);
+  };
+
+  const onDeleteMessage = async (messageId: bigint) => {
+    if (deletingMessages.has(messageId)) return;
+    
+    setDeletingMessages(prev => new Set(prev).add(messageId));
+    
+    try {
+      await conn.reducers.deleteMessage(messageId);
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      // Show error to user if needed
+    } finally {
+      setDeletingMessages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(messageId);
+        return newSet;
+      });
+    }
+  };
+
+  const isOwnMessage = (message: PrettyMessage): boolean => {
+    return identity?.toHexString() === message.sender.toHexString();
   };
 
   return (
@@ -228,12 +257,44 @@ function App() {
         <h1>Messages</h1>
         {prettyMessages.length < 1 && <p>No messages</p>}
         <div>
-          {prettyMessages.map((message, key) => (
-            <div key={key}>
-              <p>
-                <b>{message.senderName}</b>
-              </p>
-              <p>{message.text}</p>
+          {prettyMessages.map((message) => (
+            <div key={message.id} style={{ 
+              border: '1px solid #ccc', 
+              margin: '10px 0', 
+              padding: '10px',
+              borderRadius: '5px',
+              position: 'relative'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: '0 0 5px 0' }}>
+                    <b>{message.senderName}</b>
+                    <span style={{ fontSize: '0.8em', color: '#666', marginLeft: '10px' }}>
+                      {message.sent.toDate().toLocaleDateString()}
+                      
+                    </span>
+                  </p>
+                  <p style={{ margin: '0' }}>{message.text}</p>
+                </div>
+                {isOwnMessage(message) && (
+                  <button
+                    onClick={() => onDeleteMessage(message.id)}
+                    disabled={deletingMessages.has(message.id)}
+                    style={{
+                      backgroundColor: '#ff4444',
+                      color: 'white',
+                      border: 'none',
+                      padding: '5px 10px',
+                      borderRadius: '3px',
+                      cursor: deletingMessages.has(message.id) ? 'not-allowed' : 'pointer',
+                      fontSize: '0.8em',
+                      marginLeft: '10px'
+                    }}
+                  >
+                    {deletingMessages.has(message.id) ? 'Deleting...' : 'Delete'}
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

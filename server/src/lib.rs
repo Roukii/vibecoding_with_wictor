@@ -10,6 +10,9 @@ pub struct User {
 
 #[table(name = message, public)]
 pub struct Message {
+    #[primary_key]
+    #[auto_inc]
+    id: u64,
     sender: Identity,
     sent: Timestamp,
     text: String,
@@ -26,6 +29,7 @@ pub fn set_name(ctx: &ReducerContext, name: String) -> Result<(), String> {
         Err("Cannot set name for unknown user".to_string())
     }
 }
+
 /// Takes a name and checks if it's acceptable as a user's name.
 fn validate_name(name: String) -> Result<String, String> {
     if name.is_empty() {
@@ -41,12 +45,14 @@ pub fn send_message(ctx: &ReducerContext, text: String) -> Result<(), String> {
     let text = validate_message(text)?;
     log::info!("{}", text);
     ctx.db.message().insert(Message {
+        id: 0, // auto_inc will handle this
         sender: ctx.sender,
         text,
         sent: ctx.timestamp,
     });
     Ok(())
 }
+
 /// Takes a message's text and checks if it's acceptable to send.
 fn validate_message(text: String) -> Result<String, String> {
     if text.is_empty() {
@@ -55,6 +61,24 @@ fn validate_message(text: String) -> Result<String, String> {
         Ok(text)
     }
 }
+
+#[reducer]
+/// Clients invoke this reducer to delete their own messages.
+pub fn delete_message(ctx: &ReducerContext, message_id: u64) -> Result<(), String> {
+    if let Some(message) = ctx.db.message().id().find(message_id) {
+        // Check if the sender is the owner of the message
+        if message.sender == ctx.sender {
+            ctx.db.message().id().delete(message_id);
+            log::info!("Message {} deleted by user {:?}", message_id, ctx.sender);
+            Ok(())
+        } else {
+            Err("You can only delete your own messages".to_string())
+        }
+    } else {
+        Err("Message not found".to_string())
+    }
+}
+
 #[reducer(client_connected)]
 // Called when a client connects to a SpacetimeDB database server
 pub fn client_connected(ctx: &ReducerContext) {
@@ -72,6 +96,7 @@ pub fn client_connected(ctx: &ReducerContext) {
         });
     }
 }
+
 #[reducer(client_disconnected)]
 // Called when a client disconnects from SpacetimeDB database server
 pub fn identity_disconnected(ctx: &ReducerContext) {

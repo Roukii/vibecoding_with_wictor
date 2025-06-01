@@ -34,6 +34,8 @@ import {
 // Import and reexport all reducer arg types
 import { ClientConnected } from "./client_connected_reducer.ts";
 export { ClientConnected };
+import { DeleteMessage } from "./delete_message_reducer.ts";
+export { DeleteMessage };
 import { IdentityDisconnected } from "./identity_disconnected_reducer.ts";
 export { IdentityDisconnected };
 import { SendMessage } from "./send_message_reducer.ts";
@@ -58,6 +60,7 @@ const REMOTE_MODULE = {
     message: {
       tableName: "message",
       rowType: Message.getTypeScriptAlgebraicType(),
+      primaryKey: "id",
     },
     user: {
       tableName: "user",
@@ -69,6 +72,10 @@ const REMOTE_MODULE = {
     client_connected: {
       reducerName: "client_connected",
       argsType: ClientConnected.getTypeScriptAlgebraicType(),
+    },
+    delete_message: {
+      reducerName: "delete_message",
+      argsType: DeleteMessage.getTypeScriptAlgebraicType(),
     },
     identity_disconnected: {
       reducerName: "identity_disconnected",
@@ -110,6 +117,7 @@ const REMOTE_MODULE = {
 // A type representing all the possible variants of a reducer.
 export type Reducer = never
 | { name: "ClientConnected", args: ClientConnected }
+| { name: "DeleteMessage", args: DeleteMessage }
 | { name: "IdentityDisconnected", args: IdentityDisconnected }
 | { name: "SendMessage", args: SendMessage }
 | { name: "SetName", args: SetName }
@@ -124,6 +132,22 @@ export class RemoteReducers {
 
   removeOnClientConnected(callback: (ctx: ReducerEventContext) => void) {
     this.connection.offReducer("client_connected", callback);
+  }
+
+  deleteMessage(messageId: bigint) {
+    const __args = { messageId };
+    let __writer = new BinaryWriter(1024);
+    DeleteMessage.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("delete_message", __argsBuffer, this.setCallReducerFlags.deleteMessageFlags);
+  }
+
+  onDeleteMessage(callback: (ctx: ReducerEventContext, messageId: bigint) => void) {
+    this.connection.onReducer("delete_message", callback);
+  }
+
+  removeOnDeleteMessage(callback: (ctx: ReducerEventContext, messageId: bigint) => void) {
+    this.connection.offReducer("delete_message", callback);
   }
 
   onIdentityDisconnected(callback: (ctx: ReducerEventContext) => void) {
@@ -169,6 +193,11 @@ export class RemoteReducers {
 }
 
 export class SetReducerFlags {
+  deleteMessageFlags: CallReducerFlags = 'FullUpdate';
+  deleteMessage(flags: CallReducerFlags) {
+    this.deleteMessageFlags = flags;
+  }
+
   sendMessageFlags: CallReducerFlags = 'FullUpdate';
   sendMessage(flags: CallReducerFlags) {
     this.sendMessageFlags = flags;
