@@ -1,172 +1,85 @@
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp};
 
-#[spacetimedb::table(name = player, public)]
-pub struct Player {
+#[table(name = user, public)]
+pub struct User {
+    #[primary_key]
     identity: Identity,
-    name: String,
-    entity_id: Option<u32>,
+    name: Option<String>,
     online: bool,
 }
 
-#[spacetimedb::table(name = entity, public)]
-pub struct Entity {
-    id: u32,
-    x: f32,
-    y: f32,
-}
-
-#[spacetimedb::table(name = message, public)]
+#[table(name = message, public)]
 pub struct Message {
     sender: Identity,
     sent: Timestamp,
     text: String,
 }
 
-#[spacetimedb::reducer(init)]
-pub fn init(_ctx: &ReducerContext) {
-    // Called when the module is initially published
-}
-
-#[spacetimedb::reducer(client_connected)]
-pub fn identity_connected(ctx: &ReducerContext) {
-    let identity = ctx.identity();
-    let mut players = ctx.db.player().iter().filter(|p| p.identity == identity);
-
-    if let Some(existing_player) = players.next() {
-        // Update existing player's online status
-        let updated_player = Player {
-            identity,
-            name: existing_player.name.clone(),
-            entity_id: existing_player.entity_id,
-            online: true,
-        };
-        ctx.db.player().insert(updated_player);
-        log::info!("Existing player reconnected: {:?}", identity);
+#[reducer]
+/// Clients invoke this reducer to set their user names.
+pub fn set_name(ctx: &ReducerContext, name: String) -> Result<(), String> {
+    let name = validate_name(name)?;
+    if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
+        ctx.db.user().identity().update(User { name: Some(name), ..user });
+        Ok(())
     } else {
-        // Create new player
-        let default_name = format!("Player_{}", ctx.db.player().iter().count() + 1);
-        ctx.db.player().insert(Player {
-            identity,
-            name: default_name.clone(),
-            entity_id: None,
-            online: true,
-        });
-        log::info!("New player connected with identity: {:?}", identity);
+        Err("Cannot set name for unknown user".to_string())
+    }
+}
+/// Takes a name and checks if it's acceptable as a user's name.
+fn validate_name(name: String) -> Result<String, String> {
+    if name.is_empty() {
+        Err("Names must not be empty".to_string())
+    } else {
+        Ok(name)
     }
 }
 
-#[spacetimedb::reducer(client_disconnected)]
+#[reducer]
+/// Clients invoke this reducer to send messages.
+pub fn send_message(ctx: &ReducerContext, text: String) -> Result<(), String> {
+    let text = validate_message(text)?;
+    log::info!("{}", text);
+    ctx.db.message().insert(Message {
+        sender: ctx.sender,
+        text,
+        sent: ctx.timestamp,
+    });
+    Ok(())
+}
+/// Takes a message's text and checks if it's acceptable to send.
+fn validate_message(text: String) -> Result<String, String> {
+    if text.is_empty() {
+        Err("Messages must not be empty".to_string())
+    } else {
+        Ok(text)
+    }
+}
+#[reducer(client_connected)]
+// Called when a client connects to a SpacetimeDB database server
+pub fn client_connected(ctx: &ReducerContext) {
+    if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
+        // If this is a returning user, i.e. we already have a `User` with this `Identity`,
+        // set `online: true`, but leave `name` and `identity` unchanged.
+        ctx.db.user().identity().update(User { online: true, ..user });
+    } else {
+        // If this is a new user, create a `User` row for the `Identity`,
+        // which is online, but hasn't set a name.
+        ctx.db.user().insert(User {
+            name: None,
+            identity: ctx.sender,
+            online: true,
+        });
+    }
+}
+#[reducer(client_disconnected)]
+// Called when a client disconnects from SpacetimeDB database server
 pub fn identity_disconnected(ctx: &ReducerContext) {
-    let identity = ctx.identity();
-    let mut players = ctx.db.player().iter().filter(|p| p.identity == identity);
-
-    if let Some(player) = players.next() {
-        let updated_player = Player {
-            identity,
-            name: player.name.clone(),
-            entity_id: player.entity_id,
-            online: false,
-        };
-        ctx.db.player().insert(updated_player);
-        log::info!("Player disconnected: {:?}", identity);
-    }
-}
-
-#[spacetimedb::reducer]
-pub fn update_player_name(ctx: &ReducerContext, new_name: String) {
-    let identity = ctx.identity();
-    let mut players = ctx.db.player().iter().filter(|p| p.identity == identity);
-
-    if let Some(player) = players.next() {
-        let updated_player = Player {
-            identity,
-            name: new_name.clone(),
-            entity_id: player.entity_id,
-            online: player.online,
-        };
-        ctx.db.player().insert(updated_player);
-        log::info!("Player {:?} renamed to {}", identity, new_name);
+    if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
+        ctx.db.user().identity().update(User { online: false, ..user });
     } else {
-        log::warn!("Player with identity {:?} not found", identity);
-    }
-}
-
-#[spacetimedb::reducer]
-pub fn spawn_player_entity(ctx: &ReducerContext, x: f32, y: f32) {
-    let identity = ctx.identity();
-    let mut players = ctx.db.player().iter().filter(|p| p.identity == identity);
-
-    if let Some(player) = players.next() {
-        // Generate a new entity ID
-        let entity_id = (ctx.db.entity().iter().count() as u32) + 1;
-
-        // Create the entity
-        ctx.db.entity().insert(Entity {
-            id: entity_id,
-            x,
-            y,
-        });
-
-        // Update the player with the entity reference
-        let updated_player = Player {
-            identity,
-            name: player.name.clone(),
-            entity_id: Some(entity_id),
-            online: player.online,
-        };
-        ctx.db.player().insert(updated_player);
-
-        log::info!("Created entity {} for player {:?}", entity_id, identity);
-    } else {
-        log::warn!("Player with identity {:?} not found", identity);
-    }
-}
-
-#[spacetimedb::reducer]
-pub fn send_message(ctx: &ReducerContext, message: String) {
-    let identity = ctx.identity();
-    let mut players = ctx.db.player().iter().filter(|p| p.identity == identity);
-
-    if let Some(_player) = players.next() {
-        ctx.db.message().insert(Message {
-            sender: identity,
-            sent: ctx.timestamp,
-            text: message,
-        });
-    } else {
-        log::warn!(
-            "Message not sent: Player with identity {:?} not found",
-            identity
-        );
-    }
-}
-
-#[spacetimedb::reducer]
-pub fn move_entity(ctx: &ReducerContext, new_x: f32, new_y: f32) {
-    let identity = ctx.identity();
-    let player = ctx.db.player().iter().find(|p| p.identity == identity);
-
-    if let Some(player) = player {
-        if let Some(entity_id) = player.entity_id {
-            let mut entities = ctx.db.entity().iter().filter(|e| e.id == entity_id);
-            if let Some(entity) = entities.next() {
-                let updated_entity = Entity {
-                    id: entity.id,
-                    x: new_x,
-                    y: new_y,
-                };
-                ctx.db.entity().insert(updated_entity);
-                log::info!(
-                    "Entity {} moved to position ({}, {})",
-                    entity_id,
-                    new_x,
-                    new_y
-                );
-            }
-        } else {
-            log::warn!("Player {:?} has no entity assigned", identity);
-        }
-    } else {
-        log::warn!("Player with identity {:?} not found", identity);
+        // This branch should be unreachable,
+        // as it doesn't make sense for a client to disconnect without connecting first.
+        log::warn!("Disconnect event for unknown user with identity {:?}", ctx.sender);
     }
 }

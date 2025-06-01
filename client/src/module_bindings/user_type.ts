@@ -30,29 +30,36 @@ import {
   Timestamp,
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
-
-export type IdentityConnected = {};
+export type User = {
+  identity: Identity,
+  name: string | undefined,
+  online: boolean,
+};
 
 /**
  * A namespace for generated helper functions.
  */
-export namespace IdentityConnected {
+export namespace User {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createProductType([
+      new ProductTypeElement("identity", AlgebraicType.createIdentityType()),
+      new ProductTypeElement("name", AlgebraicType.createOptionType(AlgebraicType.createStringType())),
+      new ProductTypeElement("online", AlgebraicType.createBoolType()),
     ]);
   }
 
-  export function serialize(writer: BinaryWriter, value: IdentityConnected): void {
-    IdentityConnected.getTypeScriptAlgebraicType().serialize(writer, value);
+  export function serialize(writer: BinaryWriter, value: User): void {
+    User.getTypeScriptAlgebraicType().serialize(writer, value);
   }
 
-  export function deserialize(reader: BinaryReader): IdentityConnected {
-    return IdentityConnected.getTypeScriptAlgebraicType().deserialize(reader);
+  export function deserialize(reader: BinaryReader): User {
+    return User.getTypeScriptAlgebraicType().deserialize(reader);
   }
 
 }
+
 

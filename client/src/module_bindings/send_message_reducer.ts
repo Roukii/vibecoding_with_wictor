@@ -32,7 +32,7 @@ import {
 } from "@clockworklabs/spacetimedb-sdk";
 
 export type SendMessage = {
-  message: string,
+  text: string,
 };
 
 /**
@@ -45,7 +45,7 @@ export namespace SendMessage {
   */
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createProductType([
-      new ProductTypeElement("message", AlgebraicType.createStringType()),
+      new ProductTypeElement("text", AlgebraicType.createStringType()),
     ]);
   }
 

@@ -10,8 +10,7 @@
   /* 2 columns: left for chat, right for system */
   grid-template-columns: 2fr 1fr;
 
-  height: 100vh;
-  /* fill viewport height */
+  height: 100vh; /* fill viewport height */
   width: clamp(300px, 100%, 1200px);
   margin: 0 auto;
 }
@@ -27,8 +26,7 @@
 }
 
 .profile h1 {
-  margin-right: auto;
-  /* pushes name/edit form to the right */
+  margin-right: auto; /* pushes name/edit form to the right */
 }
 
 .profile form {

@@ -32,74 +32,55 @@ import {
 } from "@clockworklabs/spacetimedb-sdk";
 
 // Import and reexport all reducer arg types
-import { IdentityConnected } from "./identity_connected_reducer.ts";
-export { IdentityConnected };
+import { ClientConnected } from "./client_connected_reducer.ts";
+export { ClientConnected };
 import { IdentityDisconnected } from "./identity_disconnected_reducer.ts";
 export { IdentityDisconnected };
-import { MoveEntity } from "./move_entity_reducer.ts";
-export { MoveEntity };
 import { SendMessage } from "./send_message_reducer.ts";
 export { SendMessage };
-import { SpawnPlayerEntity } from "./spawn_player_entity_reducer.ts";
-export { SpawnPlayerEntity };
-import { UpdatePlayerName } from "./update_player_name_reducer.ts";
-export { UpdatePlayerName };
+import { SetName } from "./set_name_reducer.ts";
+export { SetName };
 
 // Import and reexport all table handle types
-import { EntityTableHandle } from "./entity_table.ts";
-export { EntityTableHandle };
 import { MessageTableHandle } from "./message_table.ts";
 export { MessageTableHandle };
-import { PlayerTableHandle } from "./player_table.ts";
-export { PlayerTableHandle };
+import { UserTableHandle } from "./user_table.ts";
+export { UserTableHandle };
 
 // Import and reexport all types
-import { Entity } from "./entity_type.ts";
-export { Entity };
 import { Message } from "./message_type.ts";
 export { Message };
-import { Player } from "./player_type.ts";
-export { Player };
+import { User } from "./user_type.ts";
+export { User };
 
 const REMOTE_MODULE = {
   tables: {
-    entity: {
-      tableName: "entity",
-      rowType: Entity.getTypeScriptAlgebraicType(),
-    },
     message: {
       tableName: "message",
       rowType: Message.getTypeScriptAlgebraicType(),
     },
-    player: {
-      tableName: "player",
-      rowType: Player.getTypeScriptAlgebraicType(),
+    user: {
+      tableName: "user",
+      rowType: User.getTypeScriptAlgebraicType(),
+      primaryKey: "identity",
     },
   },
   reducers: {
-    identity_connected: {
-      reducerName: "identity_connected",
-      argsType: IdentityConnected.getTypeScriptAlgebraicType(),
+    client_connected: {
+      reducerName: "client_connected",
+      argsType: ClientConnected.getTypeScriptAlgebraicType(),
     },
     identity_disconnected: {
       reducerName: "identity_disconnected",
       argsType: IdentityDisconnected.getTypeScriptAlgebraicType(),
     },
-    move_entity: {
-      reducerName: "move_entity",
-      argsType: MoveEntity.getTypeScriptAlgebraicType(),
-    },
     send_message: {
       reducerName: "send_message",
       argsType: SendMessage.getTypeScriptAlgebraicType(),
     },
-    spawn_player_entity: {
-      reducerName: "spawn_player_entity",
-      argsType: SpawnPlayerEntity.getTypeScriptAlgebraicType(),
-    },
-    update_player_name: {
-      reducerName: "update_player_name",
-      argsType: UpdatePlayerName.getTypeScriptAlgebraicType(),
+    set_name: {
+      reducerName: "set_name",
+      argsType: SetName.getTypeScriptAlgebraicType(),
     },
   },
   // Constructors which are used by the DbConnectionImpl to
@@ -128,23 +109,21 @@ const REMOTE_MODULE = {
 
 // A type representing all the possible variants of a reducer.
 export type Reducer = never
-| { name: "IdentityConnected", args: IdentityConnected }
+| { name: "ClientConnected", args: ClientConnected }
 | { name: "IdentityDisconnected", args: IdentityDisconnected }
-| { name: "MoveEntity", args: MoveEntity }
 | { name: "SendMessage", args: SendMessage }
-| { name: "SpawnPlayerEntity", args: SpawnPlayerEntity }
-| { name: "UpdatePlayerName", args: UpdatePlayerName }
+| { name: "SetName", args: SetName }
 ;
 
 export class RemoteReducers {
   constructor(private connection: DbConnectionImpl, private setCallReducerFlags: SetReducerFlags) {}
 
-  onIdentityConnected(callback: (ctx: ReducerEventContext) => void) {
-    this.connection.onReducer("identity_connected", callback);
+  onClientConnected(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("client_connected", callback);
   }
 
-  removeOnIdentityConnected(callback: (ctx: ReducerEventContext) => void) {
-    this.connection.offReducer("identity_connected", callback);
+  removeOnClientConnected(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("client_connected", callback);
   }
 
   onIdentityDisconnected(callback: (ctx: ReducerEventContext) => void) {
@@ -155,91 +134,49 @@ export class RemoteReducers {
     this.connection.offReducer("identity_disconnected", callback);
   }
 
-  moveEntity(newX: number, newY: number) {
-    const __args = { newX, newY };
-    let __writer = new BinaryWriter(1024);
-    MoveEntity.getTypeScriptAlgebraicType().serialize(__writer, __args);
-    let __argsBuffer = __writer.getBuffer();
-    this.connection.callReducer("move_entity", __argsBuffer, this.setCallReducerFlags.moveEntityFlags);
-  }
-
-  onMoveEntity(callback: (ctx: ReducerEventContext, newX: number, newY: number) => void) {
-    this.connection.onReducer("move_entity", callback);
-  }
-
-  removeOnMoveEntity(callback: (ctx: ReducerEventContext, newX: number, newY: number) => void) {
-    this.connection.offReducer("move_entity", callback);
-  }
-
-  sendMessage(message: string) {
-    const __args = { message };
+  sendMessage(text: string) {
+    const __args = { text };
     let __writer = new BinaryWriter(1024);
     SendMessage.getTypeScriptAlgebraicType().serialize(__writer, __args);
     let __argsBuffer = __writer.getBuffer();
     this.connection.callReducer("send_message", __argsBuffer, this.setCallReducerFlags.sendMessageFlags);
   }
 
-  onSendMessage(callback: (ctx: ReducerEventContext, message: string) => void) {
+  onSendMessage(callback: (ctx: ReducerEventContext, text: string) => void) {
     this.connection.onReducer("send_message", callback);
   }
 
-  removeOnSendMessage(callback: (ctx: ReducerEventContext, message: string) => void) {
+  removeOnSendMessage(callback: (ctx: ReducerEventContext, text: string) => void) {
     this.connection.offReducer("send_message", callback);
   }
 
-  spawnPlayerEntity(x: number, y: number) {
-    const __args = { x, y };
+  setName(name: string) {
+    const __args = { name };
     let __writer = new BinaryWriter(1024);
-    SpawnPlayerEntity.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    SetName.getTypeScriptAlgebraicType().serialize(__writer, __args);
     let __argsBuffer = __writer.getBuffer();
-    this.connection.callReducer("spawn_player_entity", __argsBuffer, this.setCallReducerFlags.spawnPlayerEntityFlags);
+    this.connection.callReducer("set_name", __argsBuffer, this.setCallReducerFlags.setNameFlags);
   }
 
-  onSpawnPlayerEntity(callback: (ctx: ReducerEventContext, x: number, y: number) => void) {
-    this.connection.onReducer("spawn_player_entity", callback);
+  onSetName(callback: (ctx: ReducerEventContext, name: string) => void) {
+    this.connection.onReducer("set_name", callback);
   }
 
-  removeOnSpawnPlayerEntity(callback: (ctx: ReducerEventContext, x: number, y: number) => void) {
-    this.connection.offReducer("spawn_player_entity", callback);
-  }
-
-  updatePlayerName(newName: string) {
-    const __args = { newName };
-    let __writer = new BinaryWriter(1024);
-    UpdatePlayerName.getTypeScriptAlgebraicType().serialize(__writer, __args);
-    let __argsBuffer = __writer.getBuffer();
-    this.connection.callReducer("update_player_name", __argsBuffer, this.setCallReducerFlags.updatePlayerNameFlags);
-  }
-
-  onUpdatePlayerName(callback: (ctx: ReducerEventContext, newName: string) => void) {
-    this.connection.onReducer("update_player_name", callback);
-  }
-
-  removeOnUpdatePlayerName(callback: (ctx: ReducerEventContext, newName: string) => void) {
-    this.connection.offReducer("update_player_name", callback);
+  removeOnSetName(callback: (ctx: ReducerEventContext, name: string) => void) {
+    this.connection.offReducer("set_name", callback);
   }
 
 }
 
 export class SetReducerFlags {
-  moveEntityFlags: CallReducerFlags = 'FullUpdate';
-  moveEntity(flags: CallReducerFlags) {
-    this.moveEntityFlags = flags;
-  }
-
   sendMessageFlags: CallReducerFlags = 'FullUpdate';
   sendMessage(flags: CallReducerFlags) {
     this.sendMessageFlags = flags;
   }
 
-  spawnPlayerEntityFlags: CallReducerFlags = 'FullUpdate';
-  spawnPlayerEntity(flags: CallReducerFlags) {
-    this.spawnPlayerEntityFlags = flags;
-  }
-
-  updatePlayerNameFlags: CallReducerFlags = 'FullUpdate';
-  updatePlayerName(flags: CallReducerFlags) {
-    this.updatePlayerNameFlags = flags;
+  setNameFlags: CallReducerFlags = 'FullUpdate';
+  setName(flags: CallReducerFlags) {
+    this.setNameFlags = flags;
   }
 
 }
@@ -247,16 +184,12 @@ export class SetReducerFlags {
 export class RemoteTables {
   constructor(private connection: DbConnectionImpl) {}
 
-  get entity(): EntityTableHandle {
-    return new EntityTableHandle(this.connection.clientCache.getOrCreateTable<Entity>(REMOTE_MODULE.tables.entity));
-  }
-
   get message(): MessageTableHandle {
     return new MessageTableHandle(this.connection.clientCache.getOrCreateTable<Message>(REMOTE_MODULE.tables.message));
   }
 
-  get player(): PlayerTableHandle {
-    return new PlayerTableHandle(this.connection.clientCache.getOrCreateTable<Player>(REMOTE_MODULE.tables.player));
+  get user(): UserTableHandle {
+    return new UserTableHandle(this.connection.clientCache.getOrCreateTable<User>(REMOTE_MODULE.tables.user));
   }
 }
 

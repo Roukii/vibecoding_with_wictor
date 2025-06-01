@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import './App.css';
 import {
   DbConnection,
-  ErrorContext,
-  EventContext,
+  type ErrorContext,
+  type EventContext,
   Message,
-  Player,
+  User,
 } from './module_bindings';
 import { Identity } from '@clockworklabs/spacetimedb-sdk';
 
@@ -15,22 +15,22 @@ export type PrettyMessage = {
 };
 
 function useMessages(conn: DbConnection | null): Message[] {
-  const [chatMessages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
 
   useEffect(() => {
     if (!conn) return;
-    const onInsert = (_ctx: EventContext, chatMessage: Message) => {
-      setMessages(prev => [...prev, chatMessage]);
+    const onInsert = (_ctx: EventContext, message: Message) => {
+      setMessages(prev => [...prev, message]);
     };
     conn.db.message.onInsert(onInsert);
 
-    const onDelete = (_ctx: EventContext, chatMessage: Message) => {
+    const onDelete = (_ctx: EventContext, message: Message) => {
       setMessages(prev =>
         prev.filter(
           m =>
-            m.text !== chatMessage.text &&
-            m.sent !== chatMessage.sent &&
-            m.sender !== chatMessage.sender
+            m.text !== message.text &&
+            m.sent !== message.sent &&
+            m.sender !== message.sender
         )
       );
     };
@@ -42,43 +42,43 @@ function useMessages(conn: DbConnection | null): Message[] {
     };
   }, [conn]);
 
-  return chatMessages;
+  return messages;
 }
 
-function usePlayers(conn: DbConnection | null): Map<string, Player> {
-  const [players, setPlayers] = useState<Map<string, Player>>(new Map());
+function useUsers(conn: DbConnection | null): Map<string, User> {
+  const [users, setUsers] = useState<Map<string, User>>(new Map());
 
   useEffect(() => {
     if (!conn) return;
-    const onInsert = (_ctx: EventContext, player: Player) => {
-      setPlayers(prev => new Map(prev.set(player.identity.toHexString(), player)));
+    const onInsert = (_ctx: EventContext, user: User) => {
+      setUsers(prev => new Map(prev.set(user.identity.toHexString(), user)));
     };
-    conn.db.player.onInsert(onInsert);
+    conn.db.user.onInsert(onInsert);
 
-    const onUpdate = (_ctx: EventContext, oldPlayer: Player, newPlayer: Player) => {
-      setPlayers(prev => {
-        prev.delete(oldPlayer.identity.toHexString());
-        return new Map(prev.set(newPlayer.identity.toHexString(), newPlayer));
+    const onUpdate = (_ctx: EventContext, oldUser: User, newUser: User) => {
+      setUsers(prev => {
+        prev.delete(oldUser.identity.toHexString());
+        return new Map(prev.set(newUser.identity.toHexString(), newUser));
       });
     };
-    conn.db.player.onUpdate(onUpdate);
+    conn.db.user.onUpdate(onUpdate);
 
-    const onDelete = (_ctx: EventContext, player: Player) => {
-      setPlayers(prev => {
-        prev.delete(player.identity.toHexString());
+    const onDelete = (_ctx: EventContext, user: User) => {
+      setUsers(prev => {
+        prev.delete(user.identity.toHexString());
         return new Map(prev);
       });
     };
-    conn.db.player.onDelete(onDelete);
+    conn.db.user.onDelete(onDelete);
 
     return () => {
-      conn.db.player.removeOnInsert(onInsert);
-      conn.db.player.removeOnUpdate(onUpdate);
-      conn.db.player.removeOnDelete(onDelete);
+      conn.db.user.removeOnInsert(onInsert);
+      conn.db.user.removeOnUpdate(onUpdate);
+      conn.db.user.removeOnDelete(onDelete);
     };
   }, [conn]);
 
-  return players;
+  return users;
 }
 
 function App() {
@@ -116,7 +116,7 @@ function App() {
         console.log('Message sent.');
       });
 
-      subscribeToQueries(conn, ['SELECT * FROM message', 'SELECT * FROM player']);
+      subscribeToQueries(conn, ['SELECT * FROM message', 'SELECT * FROM user']);
     };
 
     const onDisconnect = () => {
@@ -142,33 +142,33 @@ function App() {
 
   useEffect(() => {
     if (!conn) return;
-    conn.db.player.onInsert((_ctx, player) => {
-      if (player.online) {
-        const name = player.name || player.identity.toHexString().substring(0, 8);
+    conn.db.user.onInsert((_ctx, user) => {
+      if (user.online) {
+        const name = user.name || user.identity.toHexString().substring(0, 8);
         setSystemMessage(prev => prev + `\n${name} has connected.`);
       }
     });
-    conn.db.player.onUpdate((_ctx, oldPlayer, newPlayer) => {
+    conn.db.user.onUpdate((_ctx, oldUser, newUser) => {
       const name =
-        newPlayer.name || newPlayer.identity.toHexString().substring(0, 8);
-      if (oldPlayer.online === false && newPlayer.online === true) {
+        newUser.name || newUser.identity.toHexString().substring(0, 8);
+      if (oldUser.online === false && newUser.online === true) {
         setSystemMessage(prev => prev + `\n${name} has connected.`);
-      } else if (oldPlayer.online === true && newPlayer.online === false) {
+      } else if (oldUser.online === true && newUser.online === false) {
         setSystemMessage(prev => prev + `\n${name} has disconnected.`);
       }
     });
   }, [conn]);
 
-  const chatMessages = useMessages(conn);
-  const players = usePlayers(conn);
+  const messages = useMessages(conn);
+  const users = useUsers(conn);
 
-  const prettyMessages: PrettyMessage[] = chatMessages
+  const prettyMessages: PrettyMessage[] = messages
     .sort((a, b) => (a.sent > b.sent ? 1 : -1))
-    .map(chatMessage => ({
+    .map(message => ({
       senderName:
-        players.get(chatMessage.sender.toHexString())?.name ||
-        chatMessage.sender.toHexString().substring(0, 8),
-      text: chatMessage.text,
+        users.get(message.sender.toHexString())?.name ||
+        message.sender.toHexString().substring(0, 8),
+      text: message.text,
     }));
 
   if (!conn || !connected || !identity) {
@@ -180,14 +180,14 @@ function App() {
   }
 
   const name =
-    players.get(identity?.toHexString())?.name ||
+    users.get(identity?.toHexString())?.name ||
     identity?.toHexString().substring(0, 8) ||
     '';
 
   const onSubmitNewName = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSettingName(false);
-    conn.reducers.updatePlayerName(newName);
+    conn.reducers.setName(newName);
   };
 
   const onMessageSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -224,16 +224,16 @@ function App() {
           </form>
         )}
       </div>
-      <div className="chatMessage">
+      <div className="message">
         <h1>Messages</h1>
-        {prettyMessages.length < 1 && <p>No chatMessages</p>}
+        {prettyMessages.length < 1 && <p>No messages</p>}
         <div>
-          {prettyMessages.map((chatMessage, key) => (
+          {prettyMessages.map((message, key) => (
             <div key={key}>
               <p>
-                <b>{chatMessage.senderName}</b>
+                <b>{message.senderName}</b>
               </p>
-              <p>{chatMessage.text}</p>
+              <p>{message.text}</p>
             </div>
           ))}
         </div>
@@ -244,7 +244,7 @@ function App() {
           <p>{systemMessage}</p>
         </div>
       </div>
-      <div className="new-chatMessage">
+      <div className="new-message">
         <form
           onSubmit={onMessageSubmit}
           style={{
@@ -256,7 +256,7 @@ function App() {
         >
           <h3>New Message</h3>
           <textarea
-            aria-label="chatMessage input"
+            aria-label="message input"
             value={newMessage}
             onChange={e => setNewMessage(e.target.value)}
           ></textarea>
