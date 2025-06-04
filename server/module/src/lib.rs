@@ -1,5 +1,21 @@
+use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp};
+use game_module::dungeon_generation;
+
+#[derive(SpacetimeType, Clone, Copy, Debug)]
+pub struct Vec2 {
+    pub x: f64,
+    pub y: f64,
+}
+
+
+#[table(name = player, public)]
+pub struct Player {
+    #[primary_key]
+    pub identity: Identity,
+    pub name: String,
+    pub position: Vec2,
+}
 
 #[table(name = user, public)]
 pub struct User {
@@ -31,6 +47,7 @@ pub fn set_name(ctx: &ReducerContext, name: String) -> Result<(), String> {
         Err("Cannot set name for unknown user".to_string())
     }
 }
+
 fn validate_name(name: String) -> Result<String, String> {
     if name.is_empty() {
         Err("Names must not be empty".to_string())
@@ -38,10 +55,13 @@ fn validate_name(name: String) -> Result<String, String> {
         Ok(name)
     }
 }
+
 #[reducer]
 /// Clients invoke this reducer to set their avatar URL.
 pub fn set_avatar(ctx: &ReducerContext, avatar_url: String) -> Result<(), String> {
+    log::info!("Setting avatar for user {:?}", avatar_url);
     let avatar_url = validate_avatar_url(avatar_url)?;
+    log::info!("Validate avatar for user {:?}", avatar_url);
     if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
         ctx.db.user().identity().update(User { avatar_url: Some(avatar_url), ..user });
         Ok(())
@@ -132,4 +152,24 @@ pub fn identity_disconnected(ctx: &ReducerContext) {
         // as it doesn't make sense for a client to disconnect without connecting first.
         log::warn!("Disconnect event for unknown user with identity {:?}", ctx.sender);
     }
+}
+
+#[reducer]
+pub fn move_player(ctx: &ReducerContext, x: f64, y: f64) {
+    if let Some(mut player) = ctx.db.player().identity().find(ctx.sender) {
+        player.position.x = x;
+        player.position.y = y;
+        ctx.db.player().identity().update(player);
+    }
+}
+
+#[reducer]
+pub fn generate_dungeon_test(_ctx: &ReducerContext) {
+    // Test that our refactored dungeon generation still works
+    let mut generator = dungeon_generation::MapGenerator::new(40, 30, 6, 6, 2);
+    let _map = generator.generate();
+
+    // This is just a test to verify the modules work - in a real game
+    // you'd probably store the map data in a table
+    log::info!("Dungeon generated successfully with {} rooms", generator.rooms.len());
 }

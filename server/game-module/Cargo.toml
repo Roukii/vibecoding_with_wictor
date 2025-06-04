@@ -1,0 +1,9 @@
+[package]
+name = "game-module"
+version = "0.1.0"
+edition = "2021"
+description = "spacetime db game module"
+
+[dependencies]
+spacetimedb = "0.10"
+log = "0.4"

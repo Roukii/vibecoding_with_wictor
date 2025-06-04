@@ -36,8 +36,12 @@ import { ClientConnected } from "./client_connected_reducer.ts";
 export { ClientConnected };
 import { DeleteMessage } from "./delete_message_reducer.ts";
 export { DeleteMessage };
+import { GenerateDungeonTest } from "./generate_dungeon_test_reducer.ts";
+export { GenerateDungeonTest };
 import { IdentityDisconnected } from "./identity_disconnected_reducer.ts";
 export { IdentityDisconnected };
+import { MovePlayer } from "./move_player_reducer.ts";
+export { MovePlayer };
 import { SendMessage } from "./send_message_reducer.ts";
 export { SendMessage };
 import { SetAvatar } from "./set_avatar_reducer.ts";
@@ -48,14 +52,20 @@ export { SetName };
 // Import and reexport all table handle types
 import { MessageTableHandle } from "./message_table.ts";
 export { MessageTableHandle };
+import { PlayerTableHandle } from "./player_table.ts";
+export { PlayerTableHandle };
 import { UserTableHandle } from "./user_table.ts";
 export { UserTableHandle };
 
 // Import and reexport all types
 import { Message } from "./message_type.ts";
 export { Message };
+import { Player } from "./player_type.ts";
+export { Player };
 import { User } from "./user_type.ts";
 export { User };
+import { Vec2 } from "./vec_2_type.ts";
+export { Vec2 };
 
 const REMOTE_MODULE = {
   tables: {
@@ -63,6 +73,11 @@ const REMOTE_MODULE = {
       tableName: "message",
       rowType: Message.getTypeScriptAlgebraicType(),
       primaryKey: "id",
+    },
+    player: {
+      tableName: "player",
+      rowType: Player.getTypeScriptAlgebraicType(),
+      primaryKey: "identity",
     },
     user: {
       tableName: "user",
@@ -79,9 +94,17 @@ const REMOTE_MODULE = {
       reducerName: "delete_message",
       argsType: DeleteMessage.getTypeScriptAlgebraicType(),
     },
+    generate_dungeon_test: {
+      reducerName: "generate_dungeon_test",
+      argsType: GenerateDungeonTest.getTypeScriptAlgebraicType(),
+    },
     identity_disconnected: {
       reducerName: "identity_disconnected",
       argsType: IdentityDisconnected.getTypeScriptAlgebraicType(),
+    },
+    move_player: {
+      reducerName: "move_player",
+      argsType: MovePlayer.getTypeScriptAlgebraicType(),
     },
     send_message: {
       reducerName: "send_message",
@@ -124,7 +147,9 @@ const REMOTE_MODULE = {
 export type Reducer = never
 | { name: "ClientConnected", args: ClientConnected }
 | { name: "DeleteMessage", args: DeleteMessage }
+| { name: "GenerateDungeonTest", args: GenerateDungeonTest }
 | { name: "IdentityDisconnected", args: IdentityDisconnected }
+| { name: "MovePlayer", args: MovePlayer }
 | { name: "SendMessage", args: SendMessage }
 | { name: "SetAvatar", args: SetAvatar }
 | { name: "SetName", args: SetName }
@@ -157,12 +182,40 @@ export class RemoteReducers {
     this.connection.offReducer("delete_message", callback);
   }
 
+  generateDungeonTest() {
+    this.connection.callReducer("generate_dungeon_test", new Uint8Array(0), this.setCallReducerFlags.generateDungeonTestFlags);
+  }
+
+  onGenerateDungeonTest(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("generate_dungeon_test", callback);
+  }
+
+  removeOnGenerateDungeonTest(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("generate_dungeon_test", callback);
+  }
+
   onIdentityDisconnected(callback: (ctx: ReducerEventContext) => void) {
     this.connection.onReducer("identity_disconnected", callback);
   }
 
   removeOnIdentityDisconnected(callback: (ctx: ReducerEventContext) => void) {
     this.connection.offReducer("identity_disconnected", callback);
+  }
+
+  movePlayer(x: number, y: number) {
+    const __args = { x, y };
+    let __writer = new BinaryWriter(1024);
+    MovePlayer.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("move_player", __argsBuffer, this.setCallReducerFlags.movePlayerFlags);
+  }
+
+  onMovePlayer(callback: (ctx: ReducerEventContext, x: number, y: number) => void) {
+    this.connection.onReducer("move_player", callback);
+  }
+
+  removeOnMovePlayer(callback: (ctx: ReducerEventContext, x: number, y: number) => void) {
+    this.connection.offReducer("move_player", callback);
   }
 
   sendMessage(text: string) {
@@ -221,6 +274,16 @@ export class SetReducerFlags {
     this.deleteMessageFlags = flags;
   }
 
+  generateDungeonTestFlags: CallReducerFlags = 'FullUpdate';
+  generateDungeonTest(flags: CallReducerFlags) {
+    this.generateDungeonTestFlags = flags;
+  }
+
+  movePlayerFlags: CallReducerFlags = 'FullUpdate';
+  movePlayer(flags: CallReducerFlags) {
+    this.movePlayerFlags = flags;
+  }
+
   sendMessageFlags: CallReducerFlags = 'FullUpdate';
   sendMessage(flags: CallReducerFlags) {
     this.sendMessageFlags = flags;
@@ -243,6 +306,10 @@ export class RemoteTables {
 
   get message(): MessageTableHandle {
     return new MessageTableHandle(this.connection.clientCache.getOrCreateTable<Message>(REMOTE_MODULE.tables.message));
+  }
+
+  get player(): PlayerTableHandle {
+    return new PlayerTableHandle(this.connection.clientCache.getOrCreateTable<Player>(REMOTE_MODULE.tables.player));
   }
 
   get user(): UserTableHandle {

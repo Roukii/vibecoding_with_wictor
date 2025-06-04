@@ -1,0 +1,1 @@
+cd server &&cargo test --package game-module --lib --target x86_64-apple-darwin -- --nocapture
