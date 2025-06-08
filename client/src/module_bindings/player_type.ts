@@ -30,12 +30,9 @@ import {
   Timestamp,
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
-import { Vec2 as __Vec2 } from "./vec_2_type";
-
 export type Player = {
   identity: Identity,
   name: string,
-  position: __Vec2,
   entityId: bigint | undefined,
 };
 
@@ -51,7 +48,6 @@ export namespace Player {
     return AlgebraicType.createProductType([
       new ProductTypeElement("identity", AlgebraicType.createIdentityType()),
       new ProductTypeElement("name", AlgebraicType.createStringType()),
-      new ProductTypeElement("position", __Vec2.getTypeScriptAlgebraicType()),
       new ProductTypeElement("entityId", AlgebraicType.createOptionType(AlgebraicType.createU64Type())),
     ]);
   }

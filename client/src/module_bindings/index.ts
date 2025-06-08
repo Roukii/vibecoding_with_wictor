@@ -56,36 +56,34 @@ import { Tick } from "./tick_reducer.ts";
 export { Tick };
 
 // Import and reexport all table handle types
-import { DungeonTableHandle } from "./dungeon_table.ts";
-export { DungeonTableHandle };
 import { EntityTableHandle } from "./entity_table.ts";
 export { EntityTableHandle };
 import { GameTickTableHandle } from "./game_tick_table.ts";
 export { GameTickTableHandle };
+import { MapTableHandle } from "./map_table.ts";
+export { MapTableHandle };
 import { MessageTableHandle } from "./message_table.ts";
 export { MessageTableHandle };
 import { PlayerTableHandle } from "./player_table.ts";
 export { PlayerTableHandle };
-import { TownTableHandle } from "./town_table.ts";
-export { TownTableHandle };
 import { UserTableHandle } from "./user_table.ts";
 export { UserTableHandle };
 
 // Import and reexport all types
-import { Dungeon } from "./dungeon_type.ts";
-export { Dungeon };
 import { Entity } from "./entity_type.ts";
 export { Entity };
 import { EntityType } from "./entity_type_type.ts";
 export { EntityType };
 import { GameTick } from "./game_tick_type.ts";
 export { GameTick };
+import { Map } from "./map_type.ts";
+export { Map };
+import { MapType } from "./map_type_type.ts";
+export { MapType };
 import { Message } from "./message_type.ts";
 export { Message };
 import { Player } from "./player_type.ts";
 export { Player };
-import { Town } from "./town_type.ts";
-export { Town };
 import { User } from "./user_type.ts";
 export { User };
 import { Vec2 } from "./vec_2_type.ts";
@@ -93,11 +91,6 @@ export { Vec2 };
 
 const REMOTE_MODULE = {
   tables: {
-    dungeon: {
-      tableName: "dungeon",
-      rowType: Dungeon.getTypeScriptAlgebraicType(),
-      primaryKey: "id",
-    },
     entity: {
       tableName: "entity",
       rowType: Entity.getTypeScriptAlgebraicType(),
@@ -106,6 +99,11 @@ const REMOTE_MODULE = {
     game_tick: {
       tableName: "game_tick",
       rowType: GameTick.getTypeScriptAlgebraicType(),
+      primaryKey: "id",
+    },
+    map: {
+      tableName: "map",
+      rowType: Map.getTypeScriptAlgebraicType(),
       primaryKey: "id",
     },
     message: {
@@ -117,11 +115,6 @@ const REMOTE_MODULE = {
       tableName: "player",
       rowType: Player.getTypeScriptAlgebraicType(),
       primaryKey: "identity",
-    },
-    town: {
-      tableName: "town",
-      rowType: Town.getTypeScriptAlgebraicType(),
-      primaryKey: "id",
     },
     user: {
       tableName: "user",
@@ -418,10 +411,6 @@ export class SetReducerFlags {
 export class RemoteTables {
   constructor(private connection: DbConnectionImpl) {}
 
-  get dungeon(): DungeonTableHandle {
-    return new DungeonTableHandle(this.connection.clientCache.getOrCreateTable<Dungeon>(REMOTE_MODULE.tables.dungeon));
-  }
-
   get entity(): EntityTableHandle {
     return new EntityTableHandle(this.connection.clientCache.getOrCreateTable<Entity>(REMOTE_MODULE.tables.entity));
   }
@@ -430,16 +419,16 @@ export class RemoteTables {
     return new GameTickTableHandle(this.connection.clientCache.getOrCreateTable<GameTick>(REMOTE_MODULE.tables.game_tick));
   }
 
+  get map(): MapTableHandle {
+    return new MapTableHandle(this.connection.clientCache.getOrCreateTable<Map>(REMOTE_MODULE.tables.map));
+  }
+
   get message(): MessageTableHandle {
     return new MessageTableHandle(this.connection.clientCache.getOrCreateTable<Message>(REMOTE_MODULE.tables.message));
   }
 
   get player(): PlayerTableHandle {
     return new PlayerTableHandle(this.connection.clientCache.getOrCreateTable<Player>(REMOTE_MODULE.tables.player));
-  }
-
-  get town(): TownTableHandle {
-    return new TownTableHandle(this.connection.clientCache.getOrCreateTable<Town>(REMOTE_MODULE.tables.town));
   }
 
   get user(): UserTableHandle {

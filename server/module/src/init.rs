@@ -11,8 +11,8 @@ pub fn init(ctx: &ReducerContext) {
         "Starting Town".to_string(),
         42,   // Fixed seed for consistent starting town
         3,    // 3x3 town grid
-        30,   // room width
-        30,   // room height
+        20,   // room width
+        20,   // room height
         true, // is starting town
     )
     .map_err(|e| format!("Failed to generate starting town: {}", e));
@@ -61,8 +61,8 @@ pub fn init(ctx: &ReducerContext) {
     let dungeon_result = map_generator::Generator::generate_dungeon(
         "Exploration Dungeon".to_string(),
         123, // Different seed for dungeon
-        3,   // 3x3 grid of rooms
-        3,   // rooms height
+        10,   // 3x3 grid of rooms
+        10,   // rooms height
         20,  // room width
         20,  // room height
     )

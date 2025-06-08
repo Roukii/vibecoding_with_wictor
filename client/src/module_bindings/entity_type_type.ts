@@ -38,6 +38,7 @@ export namespace EntityType {
   export type Player = { tag: "Player" };
   export type Npc = { tag: "Npc" };
   export type Monster = { tag: "Monster" };
+  export type Summoned = { tag: "Summoned" };
   export type Item = { tag: "Item" };
 
   // Helper functions for constructing each variant of the tagged union.
@@ -49,6 +50,7 @@ export namespace EntityType {
   export const Player = { tag: "Player" };
   export const Npc = { tag: "Npc" };
   export const Monster = { tag: "Monster" };
+  export const Summoned = { tag: "Summoned" };
   export const Item = { tag: "Item" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
@@ -56,6 +58,7 @@ export namespace EntityType {
       new SumTypeVariant("Player", AlgebraicType.createProductType([])),
       new SumTypeVariant("Npc", AlgebraicType.createProductType([])),
       new SumTypeVariant("Monster", AlgebraicType.createProductType([])),
+      new SumTypeVariant("Summoned", AlgebraicType.createProductType([])),
       new SumTypeVariant("Item", AlgebraicType.createProductType([])),
     ]);
   }
@@ -71,7 +74,7 @@ export namespace EntityType {
 }
 
 // The tagged union or sum type for the algebraic type `EntityType`.
-export type EntityType = EntityType.Player | EntityType.Npc | EntityType.Monster | EntityType.Item;
+export type EntityType = EntityType.Player | EntityType.Npc | EntityType.Monster | EntityType.Summoned | EntityType.Item;
 
 export default EntityType;
 

@@ -31,15 +31,18 @@ import {
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
 import { Vec2 as __Vec2 } from "./vec_2_type";
+import { MapType as __MapType } from "./map_type_type";
 
-export type Dungeon = {
+export type Map = {
   id: bigint,
   name: string,
+  mapType: __MapType,
   width: bigint,
   height: bigint,
   tiles: Uint8Array,
   spawnPosition: __Vec2,
   spawnPoints: __Vec2[],
+  isStartingTown: boolean,
   entityIds: bigint[],
   createdAt: Timestamp,
 };
@@ -47,7 +50,7 @@ export type Dungeon = {
 /**
  * A namespace for generated helper functions.
  */
-export namespace Dungeon {
+export namespace Map {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
@@ -56,22 +59,24 @@ export namespace Dungeon {
     return AlgebraicType.createProductType([
       new ProductTypeElement("id", AlgebraicType.createU64Type()),
       new ProductTypeElement("name", AlgebraicType.createStringType()),
+      new ProductTypeElement("mapType", __MapType.getTypeScriptAlgebraicType()),
       new ProductTypeElement("width", AlgebraicType.createU64Type()),
       new ProductTypeElement("height", AlgebraicType.createU64Type()),
       new ProductTypeElement("tiles", AlgebraicType.createArrayType(AlgebraicType.createU8Type())),
       new ProductTypeElement("spawnPosition", __Vec2.getTypeScriptAlgebraicType()),
       new ProductTypeElement("spawnPoints", AlgebraicType.createArrayType(__Vec2.getTypeScriptAlgebraicType())),
+      new ProductTypeElement("isStartingTown", AlgebraicType.createBoolType()),
       new ProductTypeElement("entityIds", AlgebraicType.createArrayType(AlgebraicType.createU64Type())),
       new ProductTypeElement("createdAt", AlgebraicType.createTimestampType()),
     ]);
   }
 
-  export function serialize(writer: BinaryWriter, value: Dungeon): void {
-    Dungeon.getTypeScriptAlgebraicType().serialize(writer, value);
+  export function serialize(writer: BinaryWriter, value: Map): void {
+    Map.getTypeScriptAlgebraicType().serialize(writer, value);
   }
 
-  export function deserialize(reader: BinaryReader): Dungeon {
-    return Dungeon.getTypeScriptAlgebraicType().deserialize(reader);
+  export function deserialize(reader: BinaryReader): Map {
+    return Map.getTypeScriptAlgebraicType().deserialize(reader);
   }
 
 }

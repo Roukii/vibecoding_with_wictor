@@ -97,8 +97,6 @@ impl DungeonGenerator {
                 central_height,
                 &mut self.rng,
             ) {
-                println!("Central room width: {}", central_width);
-                println!("Central room height: {}", central_height);
                 self.rooms.push(central_room);
             } else {
                 // Fallback to simple central room if template creation fails
@@ -555,43 +553,14 @@ mod tests {
                     if room.room_type == crate::map_generator::room_templates::RoomType::Spawn {
                         edge_spawn_count += 1;
 
-                        println!(
-                            "Edge room at ({}, {}) has type: {:?} with {} spawn points",
-                            grid_x,
-                            grid_y,
-                            room.room_type,
-                            room.spawn_points.len()
-                        );
-                    } else {
-                        println!(
-                            "❌ Edge room at ({}, {}) has type: {:?} (should be Spawn!)",
-                            grid_x, grid_y, room.room_type
-                        );
                     }
                 } else {
                     // This is an interior room - check if it's wrongly marked as spawn
                     if room.room_type == crate::map_generator::room_templates::RoomType::Spawn {
-                        println!(
-                            "⚠️  Interior room at ({}, {}) has type: Spawn (should not be Spawn!)",
-                            grid_x, grid_y
-                        );
                     }
                 }
             }
         }
-
-        println!(
-            "Found {} spawn rooms out of {} total edge rooms",
-            edge_spawn_count, total_edge_rooms
-        );
-        println!(
-            "Total spawn points from ALL spawn rooms: {}",
-            total_spawn_points_from_all_spawn_rooms
-        );
-        println!(
-            "Total spawn points in generator: {}",
-            generator.spawn_points.len()
-        );
 
         // Assert that all edge rooms are spawn rooms
         assert_eq!(

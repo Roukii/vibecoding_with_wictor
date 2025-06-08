@@ -23,8 +23,8 @@ pub fn tick(ctx: &ReducerContext, schedule: GameTick) -> Result<(), String> {
     let last_tick_time = schedule.last_tick_time;
 
     // Calculate deltaTime in seconds
-    let delta_time_micros =
-        current_time.to_micros_since_unix_epoch() - last_tick_time.to_micros_since_unix_epoch();
+    // let delta_time_micros =
+    //     current_time.to_micros_since_unix_epoch() - last_tick_time.to_micros_since_unix_epoch();
 
     // Update the tick schedule with the new time
     let updated_schedule = GameTick {

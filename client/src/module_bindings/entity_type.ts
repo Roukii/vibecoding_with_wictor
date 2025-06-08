@@ -30,8 +30,8 @@ import {
   Timestamp,
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
-import { Vec2 as __Vec2 } from "./vec_2_type";
 import { EntityType as __EntityType } from "./entity_type_type";
+import { Vec2 as __Vec2 } from "./vec_2_type";
 
 export type Entity = {
   id: bigint,

@@ -30,25 +30,26 @@ import {
   Timestamp,
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
-import { Dungeon } from "./dungeon_type";
+import { Map } from "./map_type";
 import { Vec2 as __Vec2 } from "./vec_2_type";
+import { MapType as __MapType } from "./map_type_type";
 
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 
 /**
- * Table handle for the table `dungeon`.
+ * Table handle for the table `map`.
  *
- * Obtain a handle from the [`dungeon`] property on [`RemoteTables`],
- * like `ctx.db.dungeon`.
+ * Obtain a handle from the [`map`] property on [`RemoteTables`],
+ * like `ctx.db.map`.
  *
  * Users are encouraged not to explicitly reference this type,
  * but to directly chain method calls,
- * like `ctx.db.dungeon.on_insert(...)`.
+ * like `ctx.db.map.on_insert(...)`.
  */
-export class DungeonTableHandle {
-  tableCache: TableCache<Dungeon>;
+export class MapTableHandle {
+  tableCache: TableCache<Map>;
 
-  constructor(tableCache: TableCache<Dungeon>) {
+  constructor(tableCache: TableCache<Map>) {
     this.tableCache = tableCache;
   }
 
@@ -56,24 +57,24 @@ export class DungeonTableHandle {
     return this.tableCache.count();
   }
 
-  iter(): Iterable<Dungeon> {
+  iter(): Iterable<Map> {
     return this.tableCache.iter();
   }
   /**
-   * Access to the `id` unique index on the table `dungeon`,
+   * Access to the `id` unique index on the table `map`,
    * which allows point queries on the field of the same name
-   * via the [`DungeonIdUnique.find`] method.
+   * via the [`MapIdUnique.find`] method.
    *
    * Users are encouraged not to explicitly reference this type,
    * but to directly chain method calls,
-   * like `ctx.db.dungeon.id().find(...)`.
+   * like `ctx.db.map.id().find(...)`.
    *
-   * Get a handle on the `id` unique index on the table `dungeon`.
+   * Get a handle on the `id` unique index on the table `map`.
    */
   id = {
     // Find the subscribed row whose `id` column value is equal to `col_val`,
     // if such a row is present in the client cache.
-    find: (col_val: bigint): Dungeon | undefined => {
+    find: (col_val: bigint): Map | undefined => {
       for (let row of this.tableCache.iter()) {
         if (deepEqual(row.id, col_val)) {
           return row;
@@ -82,27 +83,27 @@ export class DungeonTableHandle {
     },
   };
 
-  onInsert = (cb: (ctx: EventContext, row: Dungeon) => void) => {
+  onInsert = (cb: (ctx: EventContext, row: Map) => void) => {
     return this.tableCache.onInsert(cb);
   }
 
-  removeOnInsert = (cb: (ctx: EventContext, row: Dungeon) => void) => {
+  removeOnInsert = (cb: (ctx: EventContext, row: Map) => void) => {
     return this.tableCache.removeOnInsert(cb);
   }
 
-  onDelete = (cb: (ctx: EventContext, row: Dungeon) => void) => {
+  onDelete = (cb: (ctx: EventContext, row: Map) => void) => {
     return this.tableCache.onDelete(cb);
   }
 
-  removeOnDelete = (cb: (ctx: EventContext, row: Dungeon) => void) => {
+  removeOnDelete = (cb: (ctx: EventContext, row: Map) => void) => {
     return this.tableCache.removeOnDelete(cb);
   }
 
   // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: Dungeon, newRow: Dungeon) => void) => {
+  onUpdate = (cb: (ctx: EventContext, oldRow: Map, newRow: Map) => void) => {
     return this.tableCache.onUpdate(cb);
   }
 
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: Dungeon, newRow: Dungeon) => void) => {
+  removeOnUpdate = (cb: (ctx: EventContext, onRow: Map, newRow: Map) => void) => {
     return this.tableCache.removeOnUpdate(cb);
   }}

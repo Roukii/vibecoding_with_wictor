@@ -31,8 +31,6 @@ import {
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
 import { Player } from "./player_type";
-import { Vec2 as __Vec2 } from "./vec_2_type";
-
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 
 /**
