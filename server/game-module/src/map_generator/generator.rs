@@ -25,8 +25,8 @@ pub struct DungeonParams {
 impl Default for DungeonParams {
     fn default() -> Self {
         Self {
-            rooms_width: 3,
-            rooms_height: 3,
+            rooms_width: 5,
+            rooms_height: 5,
             room_width: 20,
             room_height: 20,
             central_room_multiplier: 2,
@@ -170,7 +170,7 @@ impl Generator {
         seed: u64,
         params: DungeonParams,
     ) -> Result<MapGenerationResult, String> {
-        let mut dungeon_gen = DungeonGenerator::with_seed(
+        let mut dungeon_gen = DungeonGenerator::new(
             params.rooms_width,
             params.rooms_height,
             params.room_width,
@@ -229,12 +229,7 @@ impl Generator {
         seed: u64,
         params: TownParams,
     ) -> Result<MapGenerationResult, String> {
-        let mut town_gen = TownGenerator::with_seed(
-            params.town_size,
-            params.room_width,
-            params.room_height,
-            seed,
-        );
+        let mut town_gen = TownGenerator::with_seed(seed);
 
         let map = town_gen.generate();
         let spawn_position = town_gen.get_primary_spawn_point().unwrap_or(Position {
@@ -250,7 +245,7 @@ impl Generator {
         if params.is_starting_town {
             special_features.push("Starting Town".to_string());
         }
-        special_features.push("Town Square".to_string());
+        special_features.push("Town Square Template".to_string());
 
         Ok(MapGenerationResult {
             map_type: MapType::Town,
@@ -262,7 +257,7 @@ impl Generator {
             spawn_points,
             is_starting_town: params.is_starting_town,
             metadata: MapMetadata {
-                room_count: town_gen.rooms.len(),
+                room_count: if town_gen.room.is_some() { 1 } else { 0 },
                 seed,
                 generation_time_ms: None, // Will be set by caller
                 special_features,

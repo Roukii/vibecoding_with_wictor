@@ -3,144 +3,141 @@ use spacetimedb::rand::{Rng, SeedableRng};
 
 use crate::map_generator::room::Room;
 use crate::map_generator::room_manager::RoomManager;
-use crate::map_generator::room_templates::town_templates::*;
+use crate::map_generator::room_templates::{town_templates::*, RoomTemplate};
 use crate::map_generator::types::{Position, TileType};
 
+/// A town generator that creates custom maps from room templates.
+///
+/// This generator has been simplified to work with a single room template instead of
+/// the previous grid-based approach. It's designed to create towns from pre-defined
+/// templates without needing to specify size or other parameters.
+///
+/// # Examples
+///
+/// ```rust
+/// // Create a town using the default town square template
+/// let mut town_gen = TownGenerator::new();
+/// let map = town_gen.generate();
+///
+/// // Create a town from a custom template
+/// let mut town_gen = TownGenerator::from_template(&custom_template);
+/// let map = town_gen.generate_from_custom_template(&custom_template);
+/// ```
 pub struct TownGenerator {
     pub width: usize,
     pub height: usize,
-    pub room_width: usize,
-    pub room_height: usize,
     pub map: Vec<Vec<u8>>,
-    pub rooms: Vec<Room>,
-    pub spawn_points: Vec<Position>, // Multiple spawn points around town square
+    pub room: Option<Room>,
+    pub spawn_points: Vec<Position>,
     pub rng: StdRng,
     pub room_manager: RoomManager,
 }
 
 impl TownGenerator {
-    pub fn new(town_size: usize, room_width: usize, room_height: usize) -> Self {
-        Self::with_seed(town_size, room_width, room_height, 0)
+    /// Create a new town generator from a room template
+    pub fn from_template(template: &RoomTemplate) -> Self {
+        Self::from_template_with_seed(template, 0)
     }
 
-    pub fn with_seed(town_size: usize, room_width: usize, room_height: usize, seed: u64) -> Self {
-        // Calculate total map size - town is square
-        let room_width = room_width.max(20); // Ensure minimum room size
-        let room_height = room_height.max(20);
+    /// Create a new town generator from a room template with a specific seed
+    pub fn from_template_with_seed(template: &RoomTemplate, seed: u64) -> Self {
+        // Parse the template to get dimensions
+        let parsed = RoomManager::parse_room_template(template).expect("Invalid template");
 
-        // Each room shares a wall with adjacent rooms
-        let width = room_width + (town_size - 1) * (room_width - 1);
-        let height = room_height + (town_size - 1) * (room_height - 1);
-
+        let width = parsed.width;
+        let height = parsed.height;
         let map = vec![vec![TileType::Wall as u8; width]; height];
 
-        // Create room manager - we'll use it with the existing template system
-        let room_manager = RoomManager::new();
+        // Create room manager for towns
+        let room_manager = RoomManager::for_towns();
 
         TownGenerator {
             width,
             height,
-            room_width,
-            room_height,
             map,
-            rooms: Vec::new(),
+            room: None,
             spawn_points: Vec::new(),
             rng: StdRng::seed_from_u64(seed),
             room_manager,
         }
     }
 
+    /// Create a town generator using the default town square template
+    pub fn new() -> Self {
+        if let Some(town_square) = ALL_TOWN_TEMPLATES.iter().find(|t| t.name == "town_square") {
+            Self::from_template(town_square)
+        } else {
+            // Fallback if town square template not found
+            Self::from_template(&TOWN_SQUARE)
+        }
+    }
+
+    /// Create a town generator using the default town square template with a seed
+    pub fn with_seed(seed: u64) -> Self {
+        if let Some(town_square) = ALL_TOWN_TEMPLATES.iter().find(|t| t.name == "town_square") {
+            Self::from_template_with_seed(town_square, seed)
+        } else {
+            // Fallback if town square template not found
+            Self::from_template_with_seed(&TOWN_SQUARE, seed)
+        }
+    }
+
+    /// Generate the map from the template
     pub fn generate(&mut self) -> Vec<Vec<u8>> {
-        self.place_town_areas();
-        self.render_map();
-        self.connect_areas();
+        self.generate_from_template();
         self.generate_spawn_points();
         self.map.clone()
     }
 
-    fn place_town_areas(&mut self) {
-        let town_size = 3; // 3x3 town grid
-
-        // Place town square in the center
-        let center_x = town_size / 2;
-        let center_y = town_size / 2;
-        let center_pos_x = center_x * (self.room_width - 1);
-        let center_pos_y = center_y * (self.room_height - 1);
-
-        // Create town square using template
-        if let Some(square_template) = ALL_TOWN_TEMPLATES.iter().find(|t| t.name == "town_square") {
-            if let Ok(square_room) = self.room_manager.create_room_from_template(
-                square_template,
-                center_pos_x,
-                center_pos_y,
-                &mut self.rng,
-            ) {
-                self.rooms.push(square_room);
-            } else {
-                // Fallback to simple room
-                let square_room = Room::new(
-                    center_pos_x,
-                    center_pos_y,
-                    self.room_width,
-                    self.room_height,
-                    true,
-                );
-                self.rooms.push(square_room);
+    /// Generate the map from a specific template
+    pub fn generate_from_template(&mut self) -> Vec<Vec<u8>> {
+        // Use the town square template by default
+        if let Some(town_square) = ALL_TOWN_TEMPLATES.iter().find(|t| t.name == "town_square") {
+            if let Ok(room) =
+                self.room_manager
+                    .create_room_from_template(town_square, 0, 0, &mut self.rng)
+            {
+                self.room = Some(room);
+                self.render_map();
             }
         }
+        self.map.clone()
+    }
 
-        // Define town layout with specific buildings
-        let town_layout = [
-            ["residential", "blacksmith", "residential"],
-            ["market", "town_square", "general_store"],
-            ["town_gate", "tavern", "town_gate"],
-        ];
+    /// Generate the map from a custom template
+    pub fn generate_from_custom_template(&mut self, template: &RoomTemplate) -> Vec<Vec<u8>> {
+        // Parse the template to update dimensions if needed
+        if let Ok(parsed) = RoomManager::parse_room_template(template) {
+            // Resize map if necessary
+            if parsed.width != self.width || parsed.height != self.height {
+                self.width = parsed.width;
+                self.height = parsed.height;
+                self.map = vec![vec![TileType::Wall as u8; self.width]; self.height];
+            }
 
-        // Place other buildings around the town square
-        for (row, row_buildings) in town_layout.iter().enumerate() {
-            for (col, &building_type) in row_buildings.iter().enumerate() {
-                if building_type == "town_square" {
-                    continue; // Already placed
-                }
-
-                let pos_x = col * (self.room_width - 1);
-                let pos_y = row * (self.room_height - 1);
-
-                // Create room based on building type - use town templates
-                let room = if let Some(template) =
-                    ALL_TOWN_TEMPLATES.iter().find(|t| t.name == building_type)
-                {
-                    if let Ok(room) = self.room_manager.create_room_from_template(
-                        template,
-                        pos_x,
-                        pos_y,
-                        &mut self.rng,
-                    ) {
-                        room
-                    } else {
-                        // Fallback to simple room
-                        Room::new(pos_x, pos_y, self.room_width, self.room_height, false)
-                    }
-                } else {
-                    // Fallback to simple room
-                    Room::new(pos_x, pos_y, self.room_width, self.room_height, false)
-                };
-
-                self.rooms.push(room);
+            // Create room from template
+            if let Ok(room) =
+                self.room_manager
+                    .create_room_from_template(template, 0, 0, &mut self.rng)
+            {
+                self.room = Some(room);
+                self.render_map();
+                self.generate_spawn_points();
             }
         }
+        self.map.clone()
     }
 
     fn render_map(&mut self) {
-        // Initialize map with floor tiles (open streets/corridors between buildings)
+        // Initialize map with wall tiles
         for row in &mut self.map {
             for cell in row {
-                *cell = TileType::Floor as u8;
+                *cell = TileType::Wall as u8;
             }
         }
 
-        // Render all rooms (buildings) on top of the street grid
-        for room in &self.rooms {
+        // Render the room onto the map
+        if let Some(room) = &self.room {
             for (row_idx, row) in room.tiles.iter().enumerate() {
                 for (col_idx, &tile) in row.iter().enumerate() {
                     let global_x = room.position.x + col_idx;
@@ -154,73 +151,14 @@ impl TownGenerator {
         }
     }
 
-    fn connect_areas(&mut self) {
-        // Collect all connection points first to avoid borrowing issues
-        let mut all_connections = Vec::new();
-
-        for (i, room1) in self.rooms.iter().enumerate() {
-            for (j, room2) in self.rooms.iter().enumerate() {
-                if i >= j {
-                    continue;
-                }
-
-                let conn_points = self.find_connection_points(room1, room2);
-                if !conn_points.is_empty() {
-                    all_connections.push(conn_points);
-                }
-            }
-        }
-
-        // Now create all connections
-        for conn_points in all_connections {
-            self.create_connection(&conn_points);
-        }
-    }
-
-    fn find_connection_points(&self, room1: &Room, room2: &Room) -> Vec<Position> {
-        let mut connections = Vec::new();
-        let room1_connections = room1.get_global_connections();
-        let room2_connections = room2.get_global_connections();
-
-        for pos1 in &room1_connections {
-            for pos2 in &room2_connections {
-                let dx = pos1.x as i32 - pos2.x as i32;
-                let dy = pos1.y as i32 - pos2.y as i32;
-
-                if (dx.abs() == 1 && dy == 0) || (dx == 0 && dy.abs() == 1) {
-                    connections.push(*pos1);
-                    connections.push(*pos2);
-                }
-            }
-        }
-
-        connections
-    }
-
-    fn create_connection(&mut self, conn_points: &[Position]) {
-        // Connect adjacent connection points
-        for i in (0..conn_points.len()).step_by(2) {
-            if let (Some(pos1), Some(pos2)) = (conn_points.get(i), conn_points.get(i + 1)) {
-                self.set_tile(pos1.x, pos1.y, TileType::Door);
-                self.set_tile(pos2.x, pos2.y, TileType::Door);
-            }
-        }
-    }
-
-    fn set_tile(&mut self, x: usize, y: usize, tile_type: TileType) {
-        if x < self.width && y < self.height {
-            self.map[y][x] = tile_type as u8;
-        }
-    }
-
     fn generate_spawn_points(&mut self) {
         self.spawn_points.clear();
 
-        // Find the town square (central room)
-        if let Some(town_square) = self.rooms.iter().find(|room| room.is_central) {
-            // Add spawn points around the town square
-            let center_x = town_square.position.x + town_square.width / 2;
-            let center_y = town_square.position.y + town_square.height / 2;
+        // Generate spawn points from the room
+        if let Some(room) = &self.room {
+            // Add spawn points around the center of the room
+            let center_x = room.position.x + room.width / 2;
+            let center_y = room.position.y + room.height / 2;
 
             // Create a ring of spawn points around the center
             let spawn_radius = 5;
@@ -265,12 +203,12 @@ impl TownGenerator {
         self.spawn_points.get(index).copied()
     }
 
-    /// Get the primary spawn point (center of town square)
+    /// Get the primary spawn point (center of the room)
     pub fn get_primary_spawn_point(&self) -> Option<Position> {
-        if let Some(town_square) = self.rooms.iter().find(|room| room.is_central) {
+        if let Some(room) = &self.room {
             Some(Position {
-                x: town_square.position.x + town_square.width / 2,
-                y: town_square.position.y + town_square.height / 2,
+                x: room.position.x + room.width / 2,
+                y: room.position.y + room.height / 2,
             })
         } else {
             None

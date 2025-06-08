@@ -1,30 +1,120 @@
 use crate::map_generator::room_templates::RoomTemplate;
+use crate::map_generator::room_templates::{DUNGEON_TEMPLATES, TOWN_TEMPLATES};
 use crate::map_generator::types::{Position, TileType};
-use crate::map_generator::ALL_TEMPLATES;
 use spacetimedb::rand::Rng;
+use std::collections::HashMap;
+
+// Re-export RoomType for external use
+pub use crate::map_generator::room_templates::RoomType;
 
 #[derive(Debug, Clone)]
 pub struct ParsedRoom {
     pub name: String,
+    pub room_type: RoomType,
     pub width: usize,
     pub height: usize,
     pub tiles: Vec<Vec<TileType>>,
     pub connections: Vec<Position>,
+    pub spawn_points: Vec<Position>,
     pub is_central: bool,
+}
+
+/// Configuration for room type weights
+#[derive(Debug, Clone)]
+pub struct RoomTypeWeights {
+    pub weights: HashMap<RoomType, u32>,
+}
+
+impl RoomTypeWeights {
+    /// Create default weights for town generation
+    pub fn default_town() -> Self {
+        let mut weights = HashMap::new();
+
+        // Use the default weights from RoomType enum
+        for &room_type in &[RoomType::Town] {
+            weights.insert(room_type, room_type.default_dungeon_weight());
+        }
+
+        Self { weights }
+    }
+
+    /// Create default weights for dungeon generation
+    pub fn default_dungeon() -> Self {
+        let mut weights = HashMap::new();
+
+        // Use the default weights from RoomType enum
+        for &room_type in &[
+            RoomType::Combat,
+            RoomType::Treasure,
+            RoomType::Central,
+            RoomType::Rest,
+            RoomType::Spawn,
+        ] {
+            weights.insert(room_type, room_type.default_dungeon_weight());
+        }
+
+        Self { weights }
+    }
+
+    /// Create custom weights
+    pub fn custom(weights: HashMap<RoomType, u32>) -> Self {
+        Self { weights }
+    }
+
+    /// Check if these weights are primarily for dungeon generation
+    pub fn is_dungeon_weights(&self) -> bool {
+        // Check if we have any dungeon-specific types (excluding Central which is shared)
+        self.weights.keys().any(|room_type| {
+            matches!(
+                room_type,
+                RoomType::Combat | RoomType::Treasure | RoomType::Rest | RoomType::Spawn
+            )
+        })
+    }
 }
 
 pub struct RoomManager {
     templates: Vec<RoomTemplate>,
-    central_room: Option<&'static RoomTemplate>,
+    central_room_template_name: Option<String>,
+    room_type_weights: RoomTypeWeights,
 }
 
 impl RoomManager {
-    pub fn new() -> Self {
-        let templates = ALL_TEMPLATES.to_vec();
+    /// Create a room manager with specific room type weights
+    /// Automatically selects appropriate template collection based on weights
+    pub fn with_weights(weights: RoomTypeWeights) -> Self {
+        let templates = if weights.is_dungeon_weights() {
+            DUNGEON_TEMPLATES.to_vec()
+        } else {
+            TOWN_TEMPLATES.to_vec()
+        };
 
         RoomManager {
             templates,
-            central_room: None,
+            central_room_template_name: None,
+            room_type_weights: weights,
+        }
+    }
+
+    /// Create a room manager for dungeons
+    pub fn for_dungeons() -> Self {
+        let templates = DUNGEON_TEMPLATES.to_vec();
+
+        RoomManager {
+            templates,
+            central_room_template_name: None,
+            room_type_weights: RoomTypeWeights::default_dungeon(),
+        }
+    }
+
+    /// Create a room manager for towns
+    pub fn for_towns() -> Self {
+        let templates = TOWN_TEMPLATES.to_vec();
+
+        RoomManager {
+            templates,
+            central_room_template_name: None,
+            room_type_weights: RoomTypeWeights::default_town(),
         }
     }
 
@@ -50,6 +140,7 @@ impl RoomManager {
 
         let mut tiles = vec![vec![TileType::Wall; width]; height];
         let mut connections = Vec::new();
+        let mut spawn_points = Vec::new();
 
         for (y, line) in lines.iter().enumerate() {
             for (x, ch) in line.chars().enumerate() {
@@ -64,6 +155,11 @@ impl RoomManager {
                     }
                     'T' => TileType::Floor, // Throne or special floor tile
                     ' ' => TileType::Wall,  // Spaces are treated as walls
+                    'S' => {
+                        // S represents a spawn point (which is a floor tile)
+                        spawn_points.push(Position { x, y });
+                        TileType::Floor
+                    }
                     _ => {
                         return Err(format!(
                             "Invalid character '{}' in template '{}'",
@@ -76,30 +172,75 @@ impl RoomManager {
 
         Ok(ParsedRoom {
             name: template.name.to_string(),
+            room_type: template.room_type,
             width,
             height,
             tiles,
             connections, // Use parsed connections from template instead of manual connection_points
+            spawn_points,
             is_central: template.is_central,
         })
     }
 
-    pub fn get_random_template<R: Rng>(
+    /// Select a random room type based on configured weights
+    pub fn select_room_type<R: Rng>(&self, rng: &mut R, prefer_central: bool) -> Option<RoomType> {
+        if prefer_central {
+            // For central rooms, always return Central type
+            return Some(RoomType::Central);
+        }
+
+        // For regular rooms, exclude Central and Boss types
+        let eligible_weights: Vec<(RoomType, u32)> = self
+            .room_type_weights
+            .weights
+            .iter()
+            .filter(|(&room_type, _)| !matches!(room_type, RoomType::Central))
+            .map(|(&room_type, &weight)| (room_type, weight))
+            .collect();
+
+        let total_weight: u32 = eligible_weights.iter().map(|(_, weight)| weight).sum();
+        if total_weight == 0 {
+            return None;
+        }
+
+        let mut target = rng.gen_range(0..total_weight);
+
+        for (room_type, weight) in eligible_weights {
+            if weight > 0 && target < weight {
+                return Some(room_type);
+            }
+            target = target.saturating_sub(weight);
+        }
+
+        // Fallback - return first available non-central type
+        self.room_type_weights
+            .weights
+            .keys()
+            .find(|&room_type| !matches!(room_type, RoomType::Central))
+            .copied()
+    }
+
+    /// Get a random template of a specific room type
+    pub fn get_random_template_by_type<R: Rng>(
         &self,
         rng: &mut R,
-        prefer_central: bool,
+        room_type: RoomType,
     ) -> Option<&RoomTemplate> {
-        let candidates: Vec<&RoomTemplate> = if prefer_central {
-            self.templates.iter().filter(|t| t.is_central).collect()
-        } else {
-            self.templates.iter().filter(|t| !t.is_central).collect()
-        };
+        let candidates: Vec<&RoomTemplate> = self
+            .templates
+            .iter()
+            .filter(|t| t.room_type == room_type)
+            .collect();
 
         if candidates.is_empty() {
             return None;
         }
 
         let total_weight: u32 = candidates.iter().map(|t| t.weight).sum();
+        if total_weight == 0 {
+            return candidates.first().copied();
+        }
+
         let mut target = rng.gen_range(0..total_weight);
 
         for template in &candidates {
@@ -112,12 +253,30 @@ impl RoomManager {
         candidates.last().copied()
     }
 
-    pub fn get_template_by_name(&self, name: &str) -> Option<&RoomTemplate> {
-        self.templates.iter().find(|t| t.name == name)
+    /// Get a random room template based on room type weights
+    pub fn get_weighted_random_template<R: Rng>(
+        &self,
+        rng: &mut R,
+        prefer_central: bool,
+    ) -> Option<&RoomTemplate> {
+        // First, select a room type based on weights
+        let selected_type = self.select_room_type(rng, prefer_central)?;
+
+        // Then, select a template of that type
+        self.get_random_template_by_type(rng, selected_type)
     }
 
-    pub fn get_all_templates(&self) -> &[RoomTemplate] {
-        &self.templates
+    pub fn get_random_template<R: Rng>(
+        &self,
+        rng: &mut R,
+        prefer_central: bool,
+    ) -> Option<&RoomTemplate> {
+        // Use the new weighted selection method
+        self.get_weighted_random_template(rng, prefer_central)
+    }
+
+    pub fn get_template_by_name(&self, name: &str) -> Option<&RoomTemplate> {
+        self.templates.iter().find(|t| t.name == name)
     }
 
     /// Set a specific central room template to use
@@ -128,28 +287,18 @@ impl RoomManager {
             .find(|t| t.name == template_name && t.is_central)
             .ok_or_else(|| format!("Central room template '{}' not found", template_name))?;
 
-        // Store a reference to the template from ALL_TEMPLATES
-        self.central_room = ALL_TEMPLATES.iter().find(|t| t.name == template_name);
+        // Store a reference to the template from current templates
+        self.central_room_template_name = Some(template_name.to_string());
 
         Ok(())
     }
 
-    /// Get the currently set central room template
-    pub fn get_central_room(&self) -> Option<&RoomTemplate> {
-        self.central_room
-    }
-
-    /// Clear the central room template (use random selection)
-    pub fn clear_central_room(&mut self) {
-        self.central_room = None;
-    }
-
     /// Get a central room template - either the specifically set one or a random one
     pub fn get_central_template<R: Rng>(&self, rng: &mut R) -> Option<&RoomTemplate> {
-        if let Some(central_template) = self.central_room {
-            Some(central_template)
+        if let Some(central_template_name) = self.central_room_template_name.as_ref() {
+            self.get_template_by_name(central_template_name)
         } else {
-            self.get_random_template(rng, true)
+            self.get_random_template_by_type(rng, RoomType::Central)
         }
     }
 
@@ -168,7 +317,9 @@ impl RoomManager {
             height: parsed.height,
             tiles: parsed.tiles,
             connections: parsed.connections,
+            spawn_points: parsed.spawn_points,
             is_central: parsed.is_central,
+            room_type: parsed.room_type,
             template_name: Some(template.name.to_string()),
         })
     }
@@ -227,7 +378,9 @@ impl RoomManager {
             height: final_height,
             tiles: final_tiles,
             connections: final_connections,
+            spawn_points: parsed.spawn_points,
             is_central: parsed.is_central,
+            room_type: parsed.room_type,
             template_name: Some(template.name.to_string()),
         })
     }
@@ -235,6 +388,6 @@ impl RoomManager {
 
 impl Default for RoomManager {
     fn default() -> Self {
-        Self::new()
+        Self::for_towns()
     }
 }

@@ -1,10 +1,8 @@
 pub mod dungeon_generator;
-pub mod examples;
 pub mod generator;
 pub mod room;
 pub mod room_manager;
 pub mod room_templates;
-pub mod template_example;
 pub mod town_generator;
 pub mod types;
 pub mod utils;
@@ -16,24 +14,16 @@ pub use generator::{
 };
 pub use types::{Position, TileType};
 
-// Legacy exports for backward compatibility (private use)
-pub(crate) use dungeon_generator::DungeonGenerator;
-
-// For internal tests only
-#[cfg(test)]
-use town_generator::TownGenerator;
-
 // Internal API for advanced usage
-pub use examples::{compare_approaches, demonstrate_generator_usage, print_map_section};
 pub use room::Room;
 pub use room_manager::RoomManager;
-pub use room_templates::{RoomTemplate, ALL_TEMPLATES, ALL_TOWN_TEMPLATES};
-pub use template_example::{demonstrate_template_system, TemplateMapGenerator};
-pub use utils::{generate_example_map, run_example};
+pub use room_templates::{RoomTemplate, DUNGEON_TEMPLATES, TOWN_TEMPLATES};
+pub use town_generator::TownGenerator;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::map_generator::{dungeon_generator::DungeonGenerator, room_manager::RoomType};
     use spacetimedb::rand::SeedableRng;
 
     pub fn print_map(map: &[Vec<u8>]) {
@@ -51,7 +41,7 @@ mod tests {
     }
     #[test]
     fn test_map_generation() {
-        let mut generator = DungeonGenerator::new(6, 6, 20, 20, 2); // 2x2 rooms, each 20x20
+        let mut generator = DungeonGenerator::new(6, 6, 20, 20, 2, 10); // 2x2 rooms, each 20x20
         let map = generator.generate();
 
         print_map(&map);
@@ -66,57 +56,54 @@ mod tests {
     }
 
     #[test]
-    fn test_room_connections() {
-        let room = Room::new(10, 10, 25, 25, false); // Updated to use larger room size
-        let _connections = room.get_global_connections();
+    fn test_template_room_creation() {
+        // Test that rooms created from templates work properly
+        let room_manager = RoomManager::for_dungeons();
+        let mut rng = spacetimedb::rand::rngs::StdRng::seed_from_u64(42);
 
-        // Should have connection points on each side
-        //assert!(!connections.is_empty());
+        // Try to create a room of a specific type that we know exists
+        let combat_room = Room::random_from_type(&room_manager, 0, 0, RoomType::Combat, &mut rng)
+            .expect("Should be able to create combat room from templates");
+        assert!(combat_room.width >= 20);
+        assert!(combat_room.height >= 20);
+        assert_eq!(combat_room.get_room_type(), RoomType::Combat);
 
-        // Verify minimum size is enforced
-        assert!(room.width >= 20);
-        assert!(room.height >= 20);
-    }
-
-    #[test]
-    fn test_minimum_room_size_enforcement() {
-        // Test that Room::new enforces minimum size of 20x20
-        let small_room = Room::new(0, 0, 5, 10, false);
-        assert_eq!(small_room.width, 20);
-        assert_eq!(small_room.height, 20);
-
-        let adequate_room = Room::new(0, 0, 25, 30, false);
-        assert_eq!(adequate_room.width, 25);
-        assert_eq!(adequate_room.height, 30);
+        // Test weighted random selection (non-central)
+        let random_room = Room::random_from_templates(&room_manager, 0, 0, false, &mut rng)
+            .expect("Should be able to create random non-central room from templates");
+        assert!(random_room.width >= 20);
+        assert!(random_room.height >= 20);
+        // Should not be central or boss type for non-central selection
+        assert!(!matches!(
+            random_room.get_room_type(),
+            RoomType::Central
+        ));
     }
 
     #[test]
     fn test_town_generation() {
-        // Test town generation with 3x3 grid, 30x30 areas
-        let mut town_generator = TownGenerator::new(3, 30, 30);
+        // Test town generation using template-based approach
+        let mut town_generator = TownGenerator::new();
         let map = town_generator.generate();
 
         // Basic sanity checks
         assert!(!map.is_empty(), "Town map should not be empty");
         assert!(!map[0].is_empty(), "Town map rows should not be empty");
 
-        // Should have the correct dimensions
-        // 3 areas of 30 tiles each with 2 shared walls = 30 + 29 + 29 = 88
-        let expected_size = 30 + (3 - 1) * (30 - 1); // 88
-        assert_eq!(map.len(), expected_size, "Town height should be correct");
-        assert_eq!(map[0].len(), expected_size, "Town width should be correct");
+        // Should have the correct dimensions (30x30 from town square template)
+        assert_eq!(map.len(), 30, "Town height should be correct");
+        assert_eq!(map[0].len(), 30, "Town width should be correct");
 
-        // Should have generated rooms (town areas)
-        assert!(
-            !town_generator.rooms.is_empty(),
-            "Town should have rooms/areas"
-        );
+        // Should have generated a room
+        assert!(town_generator.room.is_some(), "Town should have a room");
 
         // Should have a central room (town square)
-        assert!(
-            town_generator.rooms.iter().any(|room| room.is_central),
-            "Town should have a central area (town square)"
-        );
+        if let Some(room) = &town_generator.room {
+            assert!(
+                room.is_central,
+                "Town should have a central area (town square)"
+            );
+        }
 
         // Should have spawn points
         assert!(
@@ -144,20 +131,18 @@ mod tests {
 
         // Verify that the map contains walkable areas (floors and doors)
         let mut has_floor = false;
-        let mut has_door = false;
 
         for row in &map {
             for &tile in row {
                 match TileType::from(tile) {
                     TileType::Floor => has_floor = true,
-                    TileType::Door => has_door = true,
+                    TileType::Door => {} // Doors are expected but not required for this test
                     TileType::Wall => {}
                 }
             }
         }
 
         assert!(has_floor, "Town should have walkable floor areas");
-        assert!(has_door, "Town should have doors connecting areas");
 
         // println!("Generated town map:");
         // print_map(&map);
@@ -166,8 +151,8 @@ mod tests {
     #[test]
     fn test_town_templates() {
         // Test that all town templates are valid and can be parsed
-        for template in ALL_TOWN_TEMPLATES {
-            let room_manager = RoomManager::new();
+        for template in TOWN_TEMPLATES {
+            let room_manager = RoomManager::for_towns();
             let parsed_result = RoomManager::parse_room_template(template);
 
             assert!(
@@ -203,14 +188,14 @@ mod tests {
     #[test]
     fn test_town_spawn_points() {
         // Test spawn point generation specifically
-        let mut town_generator = TownGenerator::new(3, 30, 30);
+        let mut town_generator = TownGenerator::new();
         let _map = town_generator.generate();
 
         let spawn_points = town_generator.get_spawn_points();
         assert!(!spawn_points.is_empty(), "Should have spawn points");
 
         // Test getting a random spawn point
-        let mut town_generator_mut = TownGenerator::new(3, 30, 30);
+        let mut town_generator_mut = TownGenerator::new();
         let _map = town_generator_mut.generate();
 
         let random_spawn = town_generator_mut.get_random_spawn_point();
@@ -232,51 +217,25 @@ mod tests {
     }
 
     #[test]
-    fn test_town_has_streets() {
-        // Test that the town has open streets (floor tiles) between buildings
-        let mut town_generator = TownGenerator::new(3, 30, 30);
+    fn test_town_structure() {
+        // Test that the town square template has proper structure
+        let mut town_generator = TownGenerator::new();
         let map = town_generator.generate();
 
-        //println!("Testing town streets:");
+        //println!("Testing town structure:");
         //print_map(&map);
 
-        // Check for streets (floor tiles) between building areas
-        // Sample some areas that should be streets
-        let mut street_tiles_found = 0;
-        let mut total_samples = 0;
-
-        // Sample the middle areas between buildings (should be streets)
-        for y in [15, 44, 73] {
-            // These are approximate middle points between 30x30 building areas
-            for x in [15, 44, 73] {
-                if y < map.len() && x < map[0].len() {
-                    total_samples += 1;
-                    if map[y][x] == TileType::Floor as u8 {
-                        street_tiles_found += 1;
-                    }
-                }
-            }
-        }
-
-        // We should have at least some street tiles in the sampled areas
-        assert!(
-            street_tiles_found > 0,
-            "Town should have street tiles (floors) between buildings, found {} street tiles out of {} samples",
-            street_tiles_found,
-            total_samples
-        );
-
-        // Also verify that not everything is just walls or just floors
+        // Verify that the map contains different tile types indicating structure
         let mut wall_count = 0;
         let mut floor_count = 0;
-        let mut door_count = 0;
+        let mut connection_count = 0;
 
         for row in &map {
             for &tile in row {
                 match TileType::from(tile) {
                     TileType::Wall => wall_count += 1,
                     TileType::Floor => floor_count += 1,
-                    TileType::Door => door_count += 1,
+                    TileType::Door => connection_count += 1,
                 }
             }
         }
@@ -285,13 +244,19 @@ mod tests {
             wall_count > 0,
             "Town should have walls (building structure)"
         );
+        assert!(floor_count > 0, "Town should have floors (walkable areas)");
+
+        // Check that the town square has reasonable structure (mix of walls and floors)
+        let total_tiles = wall_count + floor_count + connection_count;
+        let floor_ratio = floor_count as f32 / total_tiles as f32;
         assert!(
-            floor_count > 0,
-            "Town should have floors (streets and interiors)"
+            floor_ratio > 0.1 && floor_ratio < 0.9,
+            "Town should have a reasonable balance of floors and walls, got floor ratio: {}",
+            floor_ratio
         );
-        assert!(
-            door_count > 0,
-            "Town should have doors (building entrances)"
-        );
+
+        // Verify the template has the expected 30x30 dimensions
+        assert_eq!(map.len(), 30, "Town should be 30 tiles high");
+        assert_eq!(map[0].len(), 30, "Town should be 30 tiles wide");
     }
 }

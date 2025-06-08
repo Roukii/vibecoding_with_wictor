@@ -54,36 +54,6 @@ impl Map {
         &self.spawn_points
     }
 
-    /// Get valid spawn positions (floor tiles near the spawn position) - improved implementation
-    pub fn get_spawn_positions_near_primary(&self) -> Vec<Vec2> {
-        let mut positions = Vec::new();
-        let spawn_x = self.spawn_position.x as usize;
-        let spawn_y = self.spawn_position.y as usize;
-
-        // Check a larger area around the spawn position (5x5 grid)
-        let radius = 2;
-        for dy in 0..=(radius * 2) {
-            for dx in 0..=(radius * 2) {
-                let x = spawn_x.saturating_sub(radius).saturating_add(dx);
-                let y = spawn_y.saturating_sub(radius).saturating_add(dy);
-
-                if self.is_walkable(x, y) {
-                    positions.push(Vec2 {
-                        x: x as f64,
-                        y: y as f64,
-                    });
-                }
-            }
-        }
-
-        // If no positions found near spawn, return the spawn itself
-        if positions.is_empty() {
-            positions.push(self.spawn_position.clone());
-        }
-
-        positions
-    }
-
     /// Get a random spawn point from the available spawn points with seed-based selection
     pub fn get_random_spawn_point(&self, seed: usize) -> Option<Vec2> {
         if self.spawn_points.is_empty() {
