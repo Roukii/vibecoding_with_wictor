@@ -1,4 +1,4 @@
-use crate::tables::{dungeon, entity, player, town, Entity, EntityType};
+use crate::tables::{entity, player, Entity, EntityType};
 use crate::types::Vec2;
 use spacetimedb::{reducer, ReducerContext, Table};
 
@@ -49,13 +49,6 @@ pub fn move_entity(ctx: &ReducerContext, entity_id: u64, x: f64, y: f64) -> Resu
         entity.position.x = x;
         entity.position.y = y;
         ctx.db.entity().id().update(entity);
-
-        // Also update player position for backward compatibility
-        if let Some(mut player) = ctx.db.player().identity().find(ctx.sender) {
-            player.position.x = x;
-            player.position.y = y;
-            ctx.db.player().identity().update(player);
-        }
 
         Ok(())
     } else {

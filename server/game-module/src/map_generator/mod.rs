@@ -1,3 +1,5 @@
+pub mod dungeon_generator;
+pub mod examples;
 pub mod generator;
 pub mod room;
 pub mod room_manager;
@@ -8,13 +10,25 @@ pub mod types;
 pub mod utils;
 
 // Re-export the main public API
-pub use generator::MapGenerator;
+pub use generator::{
+    DungeonParams, GenerationParams, Generator, MapGenerationResult, MapMetadata, MapType,
+    TownParams, WildernessParams,
+};
+pub use types::{Position, TileType};
+
+// Legacy exports for backward compatibility (private use)
+pub(crate) use dungeon_generator::DungeonGenerator;
+
+// For internal tests only
+#[cfg(test)]
+use town_generator::TownGenerator;
+
+// Internal API for advanced usage
+pub use examples::{compare_approaches, demonstrate_generator_usage, print_map_section};
 pub use room::Room;
 pub use room_manager::RoomManager;
 pub use room_templates::{RoomTemplate, ALL_TEMPLATES, ALL_TOWN_TEMPLATES};
 pub use template_example::{demonstrate_template_system, TemplateMapGenerator};
-pub use town_generator::TownGenerator;
-pub use types::{Position, TileType};
 pub use utils::{generate_example_map, run_example};
 
 #[cfg(test)]
@@ -37,10 +51,10 @@ mod tests {
     }
     #[test]
     fn test_map_generation() {
-        let mut generator = MapGenerator::new(6, 6, 20, 20, 2); // 2x2 rooms, each 20x20
+        let mut generator = DungeonGenerator::new(6, 6, 20, 20, 2); // 2x2 rooms, each 20x20
         let map = generator.generate();
 
-        //print_map(&map);
+        print_map(&map);
 
         //Basic sanity checks
         assert_eq!(map.len(), 115);
@@ -145,7 +159,6 @@ mod tests {
         assert!(has_floor, "Town should have walkable floor areas");
         assert!(has_door, "Town should have doors connecting areas");
 
-
         // println!("Generated town map:");
         // print_map(&map);
     }
@@ -184,7 +197,7 @@ mod tests {
             );
         }
 
-        println!("All {} town templates are valid!", ALL_TOWN_TEMPLATES.len());
+        //println!("All {} town templates are valid!", ALL_TOWN_TEMPLATES.len());
     }
 
     #[test]
@@ -224,8 +237,8 @@ mod tests {
         let mut town_generator = TownGenerator::new(3, 30, 30);
         let map = town_generator.generate();
 
-        println!("Testing town streets:");
-        print_map(&map);
+        //println!("Testing town streets:");
+        //print_map(&map);
 
         // Check for streets (floor tiles) between building areas
         // Sample some areas that should be streets

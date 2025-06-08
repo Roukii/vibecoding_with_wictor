@@ -6,6 +6,7 @@ pub enum EntityType {
     Player,
     Npc,
     Monster,
+    Summoned,
     Item,
 }
 
@@ -26,8 +27,7 @@ pub struct Player {
     #[primary_key]
     pub identity: Identity,
     pub name: String,
-    pub position: Vec2, // Keep for backward compatibility, but entity position should be primary
-    pub entity_id: Option<u64>, // Reference to the player's entity
+    pub entity_id: Option<u64>,
 }
 
 #[table(name = user, public)]
@@ -49,35 +49,27 @@ pub struct Message {
     pub text: String,
 }
 
-#[table(name = dungeon, public)]
-pub struct Dungeon {
+#[derive(spacetimedb::SpacetimeType, Clone, Debug, PartialEq, Eq)]
+pub enum MapType {
+    Dungeon,
+    Town,
+    Wilderness,
+    Instance,
+}
+
+#[table(name = map, public)]
+pub struct Map {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
     pub name: String,
+    pub map_type: MapType,
     pub width: u64,
     pub height: u64,
     pub tiles: Vec<u8>, // Flattened 2D array: tiles[y * width + x] = tile_type (0=Wall, 1=Floor, 2=Door)
-    pub spawn_position: Vec2, // Primary spawn position (best spawn point)
-    pub spawn_points: Vec<Vec2>, // All possible spawn points at edges
-    pub entity_ids: Vec<u64>, // List of entity IDs in this dungeon
+    pub spawn_position: Vec2, // Primary spawn position
+    pub spawn_points: Vec<Vec2>, // All possible spawn points
+    pub is_starting_town: bool, // Whether this is the main starting town (only relevant for towns)
+    pub entity_ids: Vec<u64>, // List of entity IDs in this map
     pub created_at: Timestamp,
 }
-
-#[table(name = town, public)]
-pub struct Town {
-    #[primary_key]
-    #[auto_inc]
-    pub id: u64,
-    pub name: String,
-    pub width: u64,
-    pub height: u64,
-    pub tiles: Vec<u8>, // Flattened 2D array: tiles[y * width + x] = tile_type (0=Wall, 1=Floor, 2=Door)
-    pub spawn_position: Vec2, // Primary spawn position (center of town square)
-    pub spawn_points: Vec<Vec2>, // Multiple spawn points around town square
-    pub is_starting_town: bool, // Whether this is the main starting town
-    pub entity_ids: Vec<u64>, // List of entity IDs in this town
-    pub created_at: Timestamp,
-}
-
-// GameTick table is defined in tick.rs due to scheduled reducer requirements

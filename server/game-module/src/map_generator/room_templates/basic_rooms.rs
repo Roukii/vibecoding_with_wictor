@@ -39,11 +39,33 @@ C..................C
 #########CC#########",
 };
 
+pub const SECONDARY_ROOM: RoomTemplate = RoomTemplate {
+    name: "basic_room",
+    weight: 5,
+    is_central: false,
+    template: "
+#########CC#########
+#..................#
+#..................#
+#..................#
+#########DD#########
+#......#...........#
+#......#...........#
+#......#...........#
+C......#...........C
+C......#...........C
+###D##########D#####
+#..................#
+#..................#
+#..................#
+#..................#
+#..................#
+#..................#
+#..................#
+#..................#
+#########CC#########",
+};
 pub const ALL_TEMPLATES: &[RoomTemplate] = &[
     BASIC_ROOM,
-    // Include central room templates
-    super::central_rooms::CENTRAL_HALL,
-    super::central_rooms::CENTRAL_CHAMBER,
-    super::central_rooms::CENTRAL_COURTYARD,
-    super::central_rooms::CENTRAL_THRONE_ROOM,
+    SECONDARY_ROOM,
 ];
