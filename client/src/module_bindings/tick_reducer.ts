@@ -30,40 +30,34 @@ import {
   Timestamp,
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
-import { Vec2 as __Vec2 } from "./vec_2_type";
 
-export type Player = {
-  identity: Identity,
-  name: string,
-  position: __Vec2,
-  entityId: bigint | undefined,
+import { GameTick as __GameTick } from "./game_tick_type";
+
+export type Tick = {
+  schedule: __GameTick,
 };
 
 /**
  * A namespace for generated helper functions.
  */
-export namespace Player {
+export namespace Tick {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createProductType([
-      new ProductTypeElement("identity", AlgebraicType.createIdentityType()),
-      new ProductTypeElement("name", AlgebraicType.createStringType()),
-      new ProductTypeElement("position", __Vec2.getTypeScriptAlgebraicType()),
-      new ProductTypeElement("entityId", AlgebraicType.createOptionType(AlgebraicType.createU64Type())),
+      new ProductTypeElement("schedule", __GameTick.getTypeScriptAlgebraicType()),
     ]);
   }
 
-  export function serialize(writer: BinaryWriter, value: Player): void {
-    Player.getTypeScriptAlgebraicType().serialize(writer, value);
+  export function serialize(writer: BinaryWriter, value: Tick): void {
+    Tick.getTypeScriptAlgebraicType().serialize(writer, value);
   }
 
-  export function deserialize(reader: BinaryReader): Player {
-    return Player.getTypeScriptAlgebraicType().deserialize(reader);
+  export function deserialize(reader: BinaryReader): Tick {
+    return Tick.getTypeScriptAlgebraicType().deserialize(reader);
   }
 
 }
-
 

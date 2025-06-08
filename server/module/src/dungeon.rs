@@ -1,4 +1,4 @@
-use crate::tables::{dungeon, player, town, Dungeon, Town};
+use crate::tables::{dungeon, entity, town, Dungeon, Entity, Town};
 use crate::types::Vec2;
 use game_module::map_generator;
 use spacetimedb::{reducer, ReducerContext, Table};
@@ -47,6 +47,7 @@ pub fn init(ctx: &ReducerContext) {
         spawn_position,
         spawn_points,
         is_starting_town: true,
+        entity_ids: Vec::new(), // Initially no entities
         created_at: ctx.timestamp,
     };
 
@@ -86,6 +87,7 @@ pub fn init(ctx: &ReducerContext) {
         tiles: dungeon_tiles,
         spawn_position: dungeon_spawn_position,
         spawn_points: dungeon_spawn_points,
+        entity_ids: Vec::new(), // Initially no entities
         created_at: ctx.timestamp,
     };
 
@@ -104,8 +106,13 @@ pub fn init(ctx: &ReducerContext) {
         dungeon_generator.width,
         dungeon_generator.height
     );
-}
 
+    // Initialize the tick system to run continuously
+    match crate::tick::initialize_tick_system(ctx) {
+        Ok(()) => log::info!("Tick system initialized successfully"),
+        Err(e) => log::error!("Failed to initialize tick system: {}", e),
+    }
+}
 
 #[reducer]
 pub fn get_latest_dungeon(ctx: &ReducerContext) -> Result<(), String> {
@@ -139,99 +146,5 @@ pub fn get_starting_town(ctx: &ReducerContext) -> Result<(), String> {
         Ok(())
     } else {
         Err("No starting town found!".to_string())
-    }
-}
-
-impl Dungeon {
-    /// Get tile type at the given coordinates
-    pub fn get_tile(&self, x: usize, y: usize) -> Option<u8> {
-        if x >= self.width as usize || y >= self.height as usize {
-            return None;
-        }
-        let index = y * (self.width as usize) + x;
-        self.tiles.get(index).copied()
-    }
-
-    /// Check if a position is walkable (Floor or Door)
-    pub fn is_walkable(&self, x: usize, y: usize) -> bool {
-        match self.get_tile(x, y) {
-            Some(1) | Some(2) => true, // Floor or Door
-            _ => false,                // Wall or out of bounds
-        }
-    }
-
-    /// Get all valid spawn points at the edges of the map
-    pub fn get_spawn_positions(&self) -> &Vec<Vec2> {
-        &self.spawn_points
-    }
-
-    /// Get valid spawn positions (floor tiles near the spawn position) - legacy method
-    pub fn get_spawn_positions_near_primary(&self) -> Vec<Vec2> {
-        let mut positions = Vec::new();
-        let spawn_x = self.spawn_position.x as usize;
-        let spawn_y = self.spawn_position.y as usize;
-
-        // Check a 5x5 area around the spawn position
-        for dy in 0..5 {
-            for dx in 0..5 {
-                let x = spawn_x.saturating_sub(2).saturating_add(dx);
-                let y = spawn_y.saturating_sub(2).saturating_add(dy);
-
-                if self.is_walkable(x, y) {
-                    positions.push(Vec2 {
-                        x: x as f64,
-                        y: y as f64,
-                    });
-                }
-            }
-        }
-
-        positions
-    }
-
-    /// Get a random spawn point from the available spawn points
-    pub fn get_random_spawn_point(&self) -> Option<Vec2> {
-        if self.spawn_points.is_empty() {
-            return Some(self.spawn_position);
-        }
-
-        // Simple random selection based on the number of spawn points
-        let index = self.spawn_points.len() % self.spawn_points.len().max(1);
-        self.spawn_points.get(index).copied()
-    }
-}
-
-impl Town {
-    /// Get tile type at the given coordinates
-    pub fn get_tile(&self, x: usize, y: usize) -> Option<u8> {
-        if x >= self.width as usize || y >= self.height as usize {
-            return None;
-        }
-        let index = y * (self.width as usize) + x;
-        self.tiles.get(index).copied()
-    }
-
-    /// Check if a position is walkable (Floor or Door)
-    pub fn is_walkable(&self, x: usize, y: usize) -> bool {
-        match self.get_tile(x, y) {
-            Some(1) | Some(2) => true, // Floor or Door
-            _ => false,                // Wall or out of bounds
-        }
-    }
-
-    /// Get all valid spawn points in the town
-    pub fn get_spawn_positions(&self) -> &Vec<Vec2> {
-        &self.spawn_points
-    }
-
-    /// Get a random spawn point from the available spawn points
-    pub fn get_random_spawn_point(&self) -> Option<Vec2> {
-        if self.spawn_points.is_empty() {
-            return Some(self.spawn_position);
-        }
-
-        // Simple random selection based on the number of spawn points
-        let index = self.spawn_points.len() % self.spawn_points.len().max(1);
-        self.spawn_points.get(index).copied()
     }
 }

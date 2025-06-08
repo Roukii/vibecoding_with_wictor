@@ -31,23 +31,21 @@ import {
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
 import { Vec2 as __Vec2 } from "./vec_2_type";
+import { EntityType as __EntityType } from "./entity_type_type";
 
-export type Dungeon = {
+export type Entity = {
   id: bigint,
-  name: string,
-  width: bigint,
-  height: bigint,
-  tiles: Uint8Array,
-  spawnPosition: __Vec2,
-  spawnPoints: __Vec2[],
-  entityIds: bigint[],
+  entityType: __EntityType,
+  position: __Vec2,
+  direction: number,
+  ownerIdentity: Identity | undefined,
   createdAt: Timestamp,
 };
 
 /**
  * A namespace for generated helper functions.
  */
-export namespace Dungeon {
+export namespace Entity {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
@@ -55,23 +53,20 @@ export namespace Dungeon {
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createProductType([
       new ProductTypeElement("id", AlgebraicType.createU64Type()),
-      new ProductTypeElement("name", AlgebraicType.createStringType()),
-      new ProductTypeElement("width", AlgebraicType.createU64Type()),
-      new ProductTypeElement("height", AlgebraicType.createU64Type()),
-      new ProductTypeElement("tiles", AlgebraicType.createArrayType(AlgebraicType.createU8Type())),
-      new ProductTypeElement("spawnPosition", __Vec2.getTypeScriptAlgebraicType()),
-      new ProductTypeElement("spawnPoints", AlgebraicType.createArrayType(__Vec2.getTypeScriptAlgebraicType())),
-      new ProductTypeElement("entityIds", AlgebraicType.createArrayType(AlgebraicType.createU64Type())),
+      new ProductTypeElement("entityType", __EntityType.getTypeScriptAlgebraicType()),
+      new ProductTypeElement("position", __Vec2.getTypeScriptAlgebraicType()),
+      new ProductTypeElement("direction", AlgebraicType.createF64Type()),
+      new ProductTypeElement("ownerIdentity", AlgebraicType.createOptionType(AlgebraicType.createIdentityType())),
       new ProductTypeElement("createdAt", AlgebraicType.createTimestampType()),
     ]);
   }
 
-  export function serialize(writer: BinaryWriter, value: Dungeon): void {
-    Dungeon.getTypeScriptAlgebraicType().serialize(writer, value);
+  export function serialize(writer: BinaryWriter, value: Entity): void {
+    Entity.getTypeScriptAlgebraicType().serialize(writer, value);
   }
 
-  export function deserialize(reader: BinaryReader): Dungeon {
-    return Dungeon.getTypeScriptAlgebraicType().deserialize(reader);
+  export function deserialize(reader: BinaryReader): Entity {
+    return Entity.getTypeScriptAlgebraicType().deserialize(reader);
   }
 
 }

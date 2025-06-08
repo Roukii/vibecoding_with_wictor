@@ -43,8 +43,8 @@ mod tests {
         //print_map(&map);
 
         //Basic sanity checks
-        assert_eq!(map.len(), 30);
-        assert_eq!(map[0].len(), 40);
+        assert_eq!(map.len(), 115);
+        assert_eq!(map[0].len(), 115);
 
         //Should have at least a central room
         assert!(!generator.rooms.is_empty());

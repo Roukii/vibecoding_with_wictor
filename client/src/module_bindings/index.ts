@@ -34,10 +34,14 @@ import {
 // Import and reexport all reducer arg types
 import { ClientConnected } from "./client_connected_reducer.ts";
 export { ClientConnected };
+import { CreatePlayerEntity } from "./create_player_entity_reducer.ts";
+export { CreatePlayerEntity };
 import { DeleteMessage } from "./delete_message_reducer.ts";
 export { DeleteMessage };
 import { GetLatestDungeon } from "./get_latest_dungeon_reducer.ts";
 export { GetLatestDungeon };
+import { GetStartingTown } from "./get_starting_town_reducer.ts";
+export { GetStartingTown };
 import { IdentityDisconnected } from "./identity_disconnected_reducer.ts";
 export { IdentityDisconnected };
 import { MovePlayer } from "./move_player_reducer.ts";
@@ -48,24 +52,40 @@ import { SetAvatar } from "./set_avatar_reducer.ts";
 export { SetAvatar };
 import { SetName } from "./set_name_reducer.ts";
 export { SetName };
+import { Tick } from "./tick_reducer.ts";
+export { Tick };
 
 // Import and reexport all table handle types
 import { DungeonTableHandle } from "./dungeon_table.ts";
 export { DungeonTableHandle };
+import { EntityTableHandle } from "./entity_table.ts";
+export { EntityTableHandle };
+import { GameTickTableHandle } from "./game_tick_table.ts";
+export { GameTickTableHandle };
 import { MessageTableHandle } from "./message_table.ts";
 export { MessageTableHandle };
 import { PlayerTableHandle } from "./player_table.ts";
 export { PlayerTableHandle };
+import { TownTableHandle } from "./town_table.ts";
+export { TownTableHandle };
 import { UserTableHandle } from "./user_table.ts";
 export { UserTableHandle };
 
 // Import and reexport all types
 import { Dungeon } from "./dungeon_type.ts";
 export { Dungeon };
+import { Entity } from "./entity_type.ts";
+export { Entity };
+import { EntityType } from "./entity_type_type.ts";
+export { EntityType };
+import { GameTick } from "./game_tick_type.ts";
+export { GameTick };
 import { Message } from "./message_type.ts";
 export { Message };
 import { Player } from "./player_type.ts";
 export { Player };
+import { Town } from "./town_type.ts";
+export { Town };
 import { User } from "./user_type.ts";
 export { User };
 import { Vec2 } from "./vec_2_type.ts";
@@ -78,6 +98,16 @@ const REMOTE_MODULE = {
       rowType: Dungeon.getTypeScriptAlgebraicType(),
       primaryKey: "id",
     },
+    entity: {
+      tableName: "entity",
+      rowType: Entity.getTypeScriptAlgebraicType(),
+      primaryKey: "id",
+    },
+    game_tick: {
+      tableName: "game_tick",
+      rowType: GameTick.getTypeScriptAlgebraicType(),
+      primaryKey: "id",
+    },
     message: {
       tableName: "message",
       rowType: Message.getTypeScriptAlgebraicType(),
@@ -87,6 +117,11 @@ const REMOTE_MODULE = {
       tableName: "player",
       rowType: Player.getTypeScriptAlgebraicType(),
       primaryKey: "identity",
+    },
+    town: {
+      tableName: "town",
+      rowType: Town.getTypeScriptAlgebraicType(),
+      primaryKey: "id",
     },
     user: {
       tableName: "user",
@@ -99,6 +134,10 @@ const REMOTE_MODULE = {
       reducerName: "client_connected",
       argsType: ClientConnected.getTypeScriptAlgebraicType(),
     },
+    create_player_entity: {
+      reducerName: "create_player_entity",
+      argsType: CreatePlayerEntity.getTypeScriptAlgebraicType(),
+    },
     delete_message: {
       reducerName: "delete_message",
       argsType: DeleteMessage.getTypeScriptAlgebraicType(),
@@ -106,6 +145,10 @@ const REMOTE_MODULE = {
     get_latest_dungeon: {
       reducerName: "get_latest_dungeon",
       argsType: GetLatestDungeon.getTypeScriptAlgebraicType(),
+    },
+    get_starting_town: {
+      reducerName: "get_starting_town",
+      argsType: GetStartingTown.getTypeScriptAlgebraicType(),
     },
     identity_disconnected: {
       reducerName: "identity_disconnected",
@@ -126,6 +169,10 @@ const REMOTE_MODULE = {
     set_name: {
       reducerName: "set_name",
       argsType: SetName.getTypeScriptAlgebraicType(),
+    },
+    tick: {
+      reducerName: "tick",
+      argsType: Tick.getTypeScriptAlgebraicType(),
     },
   },
   // Constructors which are used by the DbConnectionImpl to
@@ -155,13 +202,16 @@ const REMOTE_MODULE = {
 // A type representing all the possible variants of a reducer.
 export type Reducer = never
 | { name: "ClientConnected", args: ClientConnected }
+| { name: "CreatePlayerEntity", args: CreatePlayerEntity }
 | { name: "DeleteMessage", args: DeleteMessage }
 | { name: "GetLatestDungeon", args: GetLatestDungeon }
+| { name: "GetStartingTown", args: GetStartingTown }
 | { name: "IdentityDisconnected", args: IdentityDisconnected }
 | { name: "MovePlayer", args: MovePlayer }
 | { name: "SendMessage", args: SendMessage }
 | { name: "SetAvatar", args: SetAvatar }
 | { name: "SetName", args: SetName }
+| { name: "Tick", args: Tick }
 ;
 
 export class RemoteReducers {
@@ -173,6 +223,18 @@ export class RemoteReducers {
 
   removeOnClientConnected(callback: (ctx: ReducerEventContext) => void) {
     this.connection.offReducer("client_connected", callback);
+  }
+
+  createPlayerEntity() {
+    this.connection.callReducer("create_player_entity", new Uint8Array(0), this.setCallReducerFlags.createPlayerEntityFlags);
+  }
+
+  onCreatePlayerEntity(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("create_player_entity", callback);
+  }
+
+  removeOnCreatePlayerEntity(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("create_player_entity", callback);
   }
 
   deleteMessage(messageId: bigint) {
@@ -201,6 +263,18 @@ export class RemoteReducers {
 
   removeOnGetLatestDungeon(callback: (ctx: ReducerEventContext) => void) {
     this.connection.offReducer("get_latest_dungeon", callback);
+  }
+
+  getStartingTown() {
+    this.connection.callReducer("get_starting_town", new Uint8Array(0), this.setCallReducerFlags.getStartingTownFlags);
+  }
+
+  onGetStartingTown(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("get_starting_town", callback);
+  }
+
+  removeOnGetStartingTown(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("get_starting_town", callback);
   }
 
   onIdentityDisconnected(callback: (ctx: ReducerEventContext) => void) {
@@ -275,9 +349,30 @@ export class RemoteReducers {
     this.connection.offReducer("set_name", callback);
   }
 
+  tick(schedule: GameTick) {
+    const __args = { schedule };
+    let __writer = new BinaryWriter(1024);
+    Tick.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("tick", __argsBuffer, this.setCallReducerFlags.tickFlags);
+  }
+
+  onTick(callback: (ctx: ReducerEventContext, schedule: GameTick) => void) {
+    this.connection.onReducer("tick", callback);
+  }
+
+  removeOnTick(callback: (ctx: ReducerEventContext, schedule: GameTick) => void) {
+    this.connection.offReducer("tick", callback);
+  }
+
 }
 
 export class SetReducerFlags {
+  createPlayerEntityFlags: CallReducerFlags = 'FullUpdate';
+  createPlayerEntity(flags: CallReducerFlags) {
+    this.createPlayerEntityFlags = flags;
+  }
+
   deleteMessageFlags: CallReducerFlags = 'FullUpdate';
   deleteMessage(flags: CallReducerFlags) {
     this.deleteMessageFlags = flags;
@@ -286,6 +381,11 @@ export class SetReducerFlags {
   getLatestDungeonFlags: CallReducerFlags = 'FullUpdate';
   getLatestDungeon(flags: CallReducerFlags) {
     this.getLatestDungeonFlags = flags;
+  }
+
+  getStartingTownFlags: CallReducerFlags = 'FullUpdate';
+  getStartingTown(flags: CallReducerFlags) {
+    this.getStartingTownFlags = flags;
   }
 
   movePlayerFlags: CallReducerFlags = 'FullUpdate';
@@ -308,6 +408,11 @@ export class SetReducerFlags {
     this.setNameFlags = flags;
   }
 
+  tickFlags: CallReducerFlags = 'FullUpdate';
+  tick(flags: CallReducerFlags) {
+    this.tickFlags = flags;
+  }
+
 }
 
 export class RemoteTables {
@@ -317,12 +422,24 @@ export class RemoteTables {
     return new DungeonTableHandle(this.connection.clientCache.getOrCreateTable<Dungeon>(REMOTE_MODULE.tables.dungeon));
   }
 
+  get entity(): EntityTableHandle {
+    return new EntityTableHandle(this.connection.clientCache.getOrCreateTable<Entity>(REMOTE_MODULE.tables.entity));
+  }
+
+  get gameTick(): GameTickTableHandle {
+    return new GameTickTableHandle(this.connection.clientCache.getOrCreateTable<GameTick>(REMOTE_MODULE.tables.game_tick));
+  }
+
   get message(): MessageTableHandle {
     return new MessageTableHandle(this.connection.clientCache.getOrCreateTable<Message>(REMOTE_MODULE.tables.message));
   }
 
   get player(): PlayerTableHandle {
     return new PlayerTableHandle(this.connection.clientCache.getOrCreateTable<Player>(REMOTE_MODULE.tables.player));
+  }
+
+  get town(): TownTableHandle {
+    return new TownTableHandle(this.connection.clientCache.getOrCreateTable<Town>(REMOTE_MODULE.tables.town));
   }
 
   get user(): UserTableHandle {

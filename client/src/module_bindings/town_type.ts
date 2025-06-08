@@ -32,7 +32,7 @@ import {
 } from "@clockworklabs/spacetimedb-sdk";
 import { Vec2 as __Vec2 } from "./vec_2_type";
 
-export type Dungeon = {
+export type Town = {
   id: bigint,
   name: string,
   width: bigint,
@@ -40,6 +40,7 @@ export type Dungeon = {
   tiles: Uint8Array,
   spawnPosition: __Vec2,
   spawnPoints: __Vec2[],
+  isStartingTown: boolean,
   entityIds: bigint[],
   createdAt: Timestamp,
 };
@@ -47,7 +48,7 @@ export type Dungeon = {
 /**
  * A namespace for generated helper functions.
  */
-export namespace Dungeon {
+export namespace Town {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
@@ -61,17 +62,18 @@ export namespace Dungeon {
       new ProductTypeElement("tiles", AlgebraicType.createArrayType(AlgebraicType.createU8Type())),
       new ProductTypeElement("spawnPosition", __Vec2.getTypeScriptAlgebraicType()),
       new ProductTypeElement("spawnPoints", AlgebraicType.createArrayType(__Vec2.getTypeScriptAlgebraicType())),
+      new ProductTypeElement("isStartingTown", AlgebraicType.createBoolType()),
       new ProductTypeElement("entityIds", AlgebraicType.createArrayType(AlgebraicType.createU64Type())),
       new ProductTypeElement("createdAt", AlgebraicType.createTimestampType()),
     ]);
   }
 
-  export function serialize(writer: BinaryWriter, value: Dungeon): void {
-    Dungeon.getTypeScriptAlgebraicType().serialize(writer, value);
+  export function serialize(writer: BinaryWriter, value: Town): void {
+    Town.getTypeScriptAlgebraicType().serialize(writer, value);
   }
 
-  export function deserialize(reader: BinaryReader): Dungeon {
-    return Dungeon.getTypeScriptAlgebraicType().deserialize(reader);
+  export function deserialize(reader: BinaryReader): Town {
+    return Town.getTypeScriptAlgebraicType().deserialize(reader);
   }
 
 }
