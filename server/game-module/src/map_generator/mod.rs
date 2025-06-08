@@ -42,13 +42,13 @@ mod tests {
 
         //print_map(&map);
 
-        // Basic sanity checks
-        //assert_eq!(map.len(), 30);
-        //assert_eq!(map[0].len(), 40);
+        //Basic sanity checks
+        assert_eq!(map.len(), 30);
+        assert_eq!(map[0].len(), 40);
 
-        // Should have at least a central room
-        //assert!(!generator.rooms.is_empty());
-        //assert!(generator.rooms.iter().any(|room| room.is_central));
+        //Should have at least a central room
+        assert!(!generator.rooms.is_empty());
+        assert!(generator.rooms.iter().any(|room| room.is_central));
     }
 
     #[test]
@@ -81,9 +81,6 @@ mod tests {
         // Test town generation with 3x3 grid, 30x30 areas
         let mut town_generator = TownGenerator::new(3, 30, 30);
         let map = town_generator.generate();
-
-        println!("Generated town map:");
-        print_map(&map);
 
         // Basic sanity checks
         assert!(!map.is_empty(), "Town map should not be empty");
@@ -148,13 +145,9 @@ mod tests {
         assert!(has_floor, "Town should have walkable floor areas");
         assert!(has_door, "Town should have doors connecting areas");
 
-        println!("Town generation test completed successfully!");
-        println!("Generated {} rooms/areas", town_generator.rooms.len());
-        println!(
-            "Map size: {}x{}",
-            town_generator.width, town_generator.height
-        );
-        println!("Spawn points: {}", town_generator.get_spawn_points().len());
+
+        // println!("Generated town map:");
+        // print_map(&map);
     }
 
     #[test]
@@ -223,7 +216,69 @@ mod tests {
                 "Primary spawn point should be within map bounds"
             );
         }
+    }
 
-        println!("Town spawn points test completed successfully!");
+    #[test]
+    fn test_town_has_streets() {
+        // Test that the town has open streets (floor tiles) between buildings
+        let mut town_generator = TownGenerator::new(3, 30, 30);
+        let map = town_generator.generate();
+
+        println!("Testing town streets:");
+        print_map(&map);
+
+        // Check for streets (floor tiles) between building areas
+        // Sample some areas that should be streets
+        let mut street_tiles_found = 0;
+        let mut total_samples = 0;
+
+        // Sample the middle areas between buildings (should be streets)
+        for y in [15, 44, 73] {
+            // These are approximate middle points between 30x30 building areas
+            for x in [15, 44, 73] {
+                if y < map.len() && x < map[0].len() {
+                    total_samples += 1;
+                    if map[y][x] == TileType::Floor as u8 {
+                        street_tiles_found += 1;
+                    }
+                }
+            }
+        }
+
+        // We should have at least some street tiles in the sampled areas
+        assert!(
+            street_tiles_found > 0,
+            "Town should have street tiles (floors) between buildings, found {} street tiles out of {} samples",
+            street_tiles_found,
+            total_samples
+        );
+
+        // Also verify that not everything is just walls or just floors
+        let mut wall_count = 0;
+        let mut floor_count = 0;
+        let mut door_count = 0;
+
+        for row in &map {
+            for &tile in row {
+                match TileType::from(tile) {
+                    TileType::Wall => wall_count += 1,
+                    TileType::Floor => floor_count += 1,
+                    TileType::Door => door_count += 1,
+                }
+            }
+        }
+
+        assert!(
+            wall_count > 0,
+            "Town should have walls (building structure)"
+        );
+        assert!(
+            floor_count > 0,
+            "Town should have floors (streets and interiors)"
+        );
+        assert!(
+            door_count > 0,
+            "Town should have doors (building entrances)"
+        );
     }
 }

@@ -132,14 +132,14 @@ impl TownGenerator {
     }
 
     fn render_map(&mut self) {
-        // Clear map
+        // Initialize map with floor tiles (open streets/corridors between buildings)
         for row in &mut self.map {
             for cell in row {
-                *cell = TileType::Wall as u8;
+                *cell = TileType::Floor as u8;
             }
         }
 
-        // Render all rooms
+        // Render all rooms (buildings) on top of the street grid
         for room in &self.rooms {
             for (row_idx, row) in room.tiles.iter().enumerate() {
                 for (col_idx, &tile) in row.iter().enumerate() {
