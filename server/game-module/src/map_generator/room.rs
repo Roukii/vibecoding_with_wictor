@@ -1,6 +1,6 @@
-use crate::dungeon_generation::room_manager::RoomManager;
-use crate::dungeon_generation::room_templates::RoomTemplate;
-use crate::dungeon_generation::types::{Position, TileType};
+use crate::map_generator::room_manager::RoomManager;
+use crate::map_generator::room_templates::RoomTemplate;
+use crate::map_generator::types::{Position, TileType};
 use spacetimedb::rand::Rng;
 
 #[derive(Debug, Clone)]

@@ -1,1 +1,1 @@
-pub mod dungeon_generation;
+pub mod map_generator;

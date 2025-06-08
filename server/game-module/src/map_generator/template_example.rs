@@ -1,4 +1,4 @@
-use crate::dungeon_generation::{room::Room, room_manager::RoomManager, types::TileType};
+use crate::map_generator::{room::Room, room_manager::RoomManager, types::TileType};
 use spacetimedb::rand::{rngs::StdRng, SeedableRng};
 
 /// Example function demonstrating how to use the new room template system

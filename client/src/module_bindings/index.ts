@@ -36,8 +36,8 @@ import { ClientConnected } from "./client_connected_reducer.ts";
 export { ClientConnected };
 import { DeleteMessage } from "./delete_message_reducer.ts";
 export { DeleteMessage };
-import { GenerateDungeonTest } from "./generate_dungeon_test_reducer.ts";
-export { GenerateDungeonTest };
+import { GetLatestDungeon } from "./get_latest_dungeon_reducer.ts";
+export { GetLatestDungeon };
 import { IdentityDisconnected } from "./identity_disconnected_reducer.ts";
 export { IdentityDisconnected };
 import { MovePlayer } from "./move_player_reducer.ts";
@@ -50,6 +50,8 @@ import { SetName } from "./set_name_reducer.ts";
 export { SetName };
 
 // Import and reexport all table handle types
+import { DungeonTableHandle } from "./dungeon_table.ts";
+export { DungeonTableHandle };
 import { MessageTableHandle } from "./message_table.ts";
 export { MessageTableHandle };
 import { PlayerTableHandle } from "./player_table.ts";
@@ -58,6 +60,8 @@ import { UserTableHandle } from "./user_table.ts";
 export { UserTableHandle };
 
 // Import and reexport all types
+import { Dungeon } from "./dungeon_type.ts";
+export { Dungeon };
 import { Message } from "./message_type.ts";
 export { Message };
 import { Player } from "./player_type.ts";
@@ -69,6 +73,11 @@ export { Vec2 };
 
 const REMOTE_MODULE = {
   tables: {
+    dungeon: {
+      tableName: "dungeon",
+      rowType: Dungeon.getTypeScriptAlgebraicType(),
+      primaryKey: "id",
+    },
     message: {
       tableName: "message",
       rowType: Message.getTypeScriptAlgebraicType(),
@@ -94,9 +103,9 @@ const REMOTE_MODULE = {
       reducerName: "delete_message",
       argsType: DeleteMessage.getTypeScriptAlgebraicType(),
     },
-    generate_dungeon_test: {
-      reducerName: "generate_dungeon_test",
-      argsType: GenerateDungeonTest.getTypeScriptAlgebraicType(),
+    get_latest_dungeon: {
+      reducerName: "get_latest_dungeon",
+      argsType: GetLatestDungeon.getTypeScriptAlgebraicType(),
     },
     identity_disconnected: {
       reducerName: "identity_disconnected",
@@ -147,7 +156,7 @@ const REMOTE_MODULE = {
 export type Reducer = never
 | { name: "ClientConnected", args: ClientConnected }
 | { name: "DeleteMessage", args: DeleteMessage }
-| { name: "GenerateDungeonTest", args: GenerateDungeonTest }
+| { name: "GetLatestDungeon", args: GetLatestDungeon }
 | { name: "IdentityDisconnected", args: IdentityDisconnected }
 | { name: "MovePlayer", args: MovePlayer }
 | { name: "SendMessage", args: SendMessage }
@@ -182,16 +191,16 @@ export class RemoteReducers {
     this.connection.offReducer("delete_message", callback);
   }
 
-  generateDungeonTest() {
-    this.connection.callReducer("generate_dungeon_test", new Uint8Array(0), this.setCallReducerFlags.generateDungeonTestFlags);
+  getLatestDungeon() {
+    this.connection.callReducer("get_latest_dungeon", new Uint8Array(0), this.setCallReducerFlags.getLatestDungeonFlags);
   }
 
-  onGenerateDungeonTest(callback: (ctx: ReducerEventContext) => void) {
-    this.connection.onReducer("generate_dungeon_test", callback);
+  onGetLatestDungeon(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("get_latest_dungeon", callback);
   }
 
-  removeOnGenerateDungeonTest(callback: (ctx: ReducerEventContext) => void) {
-    this.connection.offReducer("generate_dungeon_test", callback);
+  removeOnGetLatestDungeon(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("get_latest_dungeon", callback);
   }
 
   onIdentityDisconnected(callback: (ctx: ReducerEventContext) => void) {
@@ -274,9 +283,9 @@ export class SetReducerFlags {
     this.deleteMessageFlags = flags;
   }
 
-  generateDungeonTestFlags: CallReducerFlags = 'FullUpdate';
-  generateDungeonTest(flags: CallReducerFlags) {
-    this.generateDungeonTestFlags = flags;
+  getLatestDungeonFlags: CallReducerFlags = 'FullUpdate';
+  getLatestDungeon(flags: CallReducerFlags) {
+    this.getLatestDungeonFlags = flags;
   }
 
   movePlayerFlags: CallReducerFlags = 'FullUpdate';
@@ -303,6 +312,10 @@ export class SetReducerFlags {
 
 export class RemoteTables {
   constructor(private connection: DbConnectionImpl) {}
+
+  get dungeon(): DungeonTableHandle {
+    return new DungeonTableHandle(this.connection.clientCache.getOrCreateTable<Dungeon>(REMOTE_MODULE.tables.dungeon));
+  }
 
   get message(): MessageTableHandle {
     return new MessageTableHandle(this.connection.clientCache.getOrCreateTable<Message>(REMOTE_MODULE.tables.message));

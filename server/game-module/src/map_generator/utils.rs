@@ -1,4 +1,4 @@
-use crate::dungeon_generation::generator::MapGenerator;
+use crate::map_generator::generator::MapGenerator;
 
 // Example usage
 pub fn generate_example_map() {

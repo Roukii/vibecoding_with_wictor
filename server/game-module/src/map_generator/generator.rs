@@ -1,9 +1,9 @@
 use spacetimedb::rand::rngs::StdRng;
 use spacetimedb::rand::{Rng, SeedableRng};
 
-use crate::dungeon_generation::room::Room;
-use crate::dungeon_generation::room_manager::RoomManager;
-use crate::dungeon_generation::types::{Position, TileType};
+use crate::map_generator::room::Room;
+use crate::map_generator::room_manager::RoomManager;
+use crate::map_generator::types::{Position, TileType};
 
 pub struct MapGenerator {
     pub width: usize,
@@ -14,6 +14,7 @@ pub struct MapGenerator {
     pub map: Vec<Vec<u8>>,
     pub rooms: Vec<Room>,
     pub room_grid: Vec<Vec<Option<usize>>>, // Grid indicating which room occupies each cell
+    pub spawn_points: Vec<Position>,        // List of possible spawn points at map edges
     pub rng: StdRng,
     pub room_manager: RoomManager,
 }
@@ -63,6 +64,7 @@ impl MapGenerator {
             map,
             rooms: Vec::new(),
             room_grid,
+            spawn_points: Vec::new(),
             rng: StdRng::seed_from_u64(seed),
             room_manager: RoomManager::new(),
         }
@@ -72,6 +74,7 @@ impl MapGenerator {
         self.place_rooms();
         self.render_map(); // Render rooms first
         self.connect_rooms(); // Then place doors on top
+        self.generate_spawn_points(); // Generate spawn points at map edges
         self.map.clone()
     }
 
@@ -83,7 +86,7 @@ impl MapGenerator {
     /// Get the currently set central room template
     pub fn get_central_room_template(
         &self,
-    ) -> Option<&crate::dungeon_generation::room_templates::RoomTemplate> {
+    ) -> Option<&crate::map_generator::room_templates::RoomTemplate> {
         self.room_manager.get_central_room()
     }
 
@@ -300,6 +303,78 @@ impl MapGenerator {
         }
     }
 
+    fn generate_spawn_points(&mut self) {
+        self.spawn_points.clear();
+
+        // Find all floor tiles on the edges of the map
+        for room in &self.rooms {
+            if room.is_central {
+                continue; // Skip central rooms for spawn points
+            }
+
+            // Check if room touches any edge of the map
+            let touches_left = room.position.x == 0;
+            let touches_right = room.position.x + room.width >= self.width;
+            let touches_top = room.position.y == 0;
+            let touches_bottom = room.position.y + room.height >= self.height;
+
+            if touches_left || touches_right || touches_top || touches_bottom {
+                // Find floor tiles in this edge room
+                for (row_idx, row) in room.tiles.iter().enumerate() {
+                    for (col_idx, &tile) in row.iter().enumerate() {
+                        if tile == TileType::Floor {
+                            let global_x = room.position.x + col_idx;
+                            let global_y = room.position.y + row_idx;
+
+                            // Check if this floor tile is actually on the edge
+                            let is_edge = (global_x == 0 && touches_left)
+                                || (global_x == self.width - 1 && touches_right)
+                                || (global_y == 0 && touches_top)
+                                || (global_y == self.height - 1 && touches_bottom);
+
+                            // Or if it's close to the edge (within 2 tiles)
+                            let is_near_edge = global_x < 2
+                                || global_x >= self.width - 2
+                                || global_y < 2
+                                || global_y >= self.height - 2;
+
+                            if is_edge || is_near_edge {
+                                self.spawn_points.push(Position {
+                                    x: global_x,
+                                    y: global_y,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // If no spawn points found, add some default ones
+        if self.spawn_points.is_empty() {
+            // Add corners as fallback spawn points
+            let margin = 2;
+            self.spawn_points.extend_from_slice(&[
+                Position {
+                    x: margin,
+                    y: margin,
+                },
+                Position {
+                    x: self.width - margin - 1,
+                    y: margin,
+                },
+                Position {
+                    x: margin,
+                    y: self.height - margin - 1,
+                },
+                Position {
+                    x: self.width - margin - 1,
+                    y: self.height - margin - 1,
+                },
+            ]);
+        }
+    }
+
     pub fn get_spawn_room(&self) -> Option<Position> {
         // Find an edge room (not central room)
         let edge_rooms: Vec<&Room> = self
@@ -344,5 +419,45 @@ impl MapGenerator {
                 x: room.position.x + room.width / 2,
                 y: room.position.y + room.height / 2,
             })
+    }
+
+    /// Get all possible spawn points at the edges of the map
+    pub fn get_spawn_points(&self) -> &Vec<Position> {
+        &self.spawn_points
+    }
+
+    /// Get a random spawn point from the available spawn points
+    pub fn get_random_spawn_point(&self) -> Option<Position> {
+        if self.spawn_points.is_empty() {
+            return None;
+        }
+
+        // Create a temporary RNG with a seed based on the current state
+        let mut temp_rng = StdRng::seed_from_u64(self.spawn_points.len() as u64);
+        let index = temp_rng.gen_range(0..self.spawn_points.len());
+        self.spawn_points.get(index).copied()
+    }
+
+    /// Get the best spawn point (closest to an edge)
+    pub fn get_best_spawn_point(&self) -> Option<Position> {
+        if self.spawn_points.is_empty() {
+            return None;
+        }
+
+        // Find the spawn point closest to any edge
+        self.spawn_points
+            .iter()
+            .min_by_key(|pos| {
+                let dist_to_left = pos.x;
+                let dist_to_right = self.width.saturating_sub(pos.x + 1);
+                let dist_to_top = pos.y;
+                let dist_to_bottom = self.height.saturating_sub(pos.y + 1);
+
+                dist_to_left
+                    .min(dist_to_right)
+                    .min(dist_to_top)
+                    .min(dist_to_bottom)
+            })
+            .copied()
     }
 }

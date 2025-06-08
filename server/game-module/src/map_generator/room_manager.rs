@@ -1,6 +1,6 @@
-use crate::dungeon_generation::room_templates::RoomTemplate;
-use crate::dungeon_generation::types::{Position, TileType};
-use crate::dungeon_generation::ALL_TEMPLATES;
+use crate::map_generator::room_templates::RoomTemplate;
+use crate::map_generator::types::{Position, TileType};
+use crate::map_generator::ALL_TEMPLATES;
 use spacetimedb::rand::Rng;
 
 #[derive(Debug, Clone)]
@@ -159,10 +159,10 @@ impl RoomManager {
         x: usize,
         y: usize,
         _rng: &mut R,
-    ) -> Result<crate::dungeon_generation::room::Room, String> {
+    ) -> Result<crate::map_generator::room::Room, String> {
         let parsed = Self::parse_room_template(template)?;
 
-        Ok(crate::dungeon_generation::room::Room {
+        Ok(crate::map_generator::room::Room {
             position: Position { x, y },
             width: parsed.width,
             height: parsed.height,
@@ -181,7 +181,7 @@ impl RoomManager {
         min_width: usize,
         min_height: usize,
         _rng: &mut R,
-    ) -> Result<crate::dungeon_generation::room::Room, String> {
+    ) -> Result<crate::map_generator::room::Room, String> {
         let parsed = Self::parse_room_template(template)?;
 
         // Use the larger of template size or minimum size
@@ -221,7 +221,7 @@ impl RoomManager {
                 (parsed.tiles, parsed.connections.clone())
             };
 
-        Ok(crate::dungeon_generation::room::Room {
+        Ok(crate::map_generator::room::Room {
             position: Position { x, y },
             width: final_width,
             height: final_height,

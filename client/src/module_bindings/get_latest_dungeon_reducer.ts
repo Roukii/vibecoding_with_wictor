@@ -31,12 +31,12 @@ import {
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
 
-export type GenerateDungeonTest = {};
+export type GetLatestDungeon = {};
 
 /**
  * A namespace for generated helper functions.
  */
-export namespace GenerateDungeonTest {
+export namespace GetLatestDungeon {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
@@ -46,12 +46,12 @@ export namespace GenerateDungeonTest {
     ]);
   }
 
-  export function serialize(writer: BinaryWriter, value: GenerateDungeonTest): void {
-    GenerateDungeonTest.getTypeScriptAlgebraicType().serialize(writer, value);
+  export function serialize(writer: BinaryWriter, value: GetLatestDungeon): void {
+    GetLatestDungeon.getTypeScriptAlgebraicType().serialize(writer, value);
   }
 
-  export function deserialize(reader: BinaryReader): GenerateDungeonTest {
-    return GenerateDungeonTest.getTypeScriptAlgebraicType().deserialize(reader);
+  export function deserialize(reader: BinaryReader): GetLatestDungeon {
+    return GetLatestDungeon.getTypeScriptAlgebraicType().deserialize(reader);
   }
 
 }
