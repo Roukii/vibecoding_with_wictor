@@ -8,7 +8,6 @@ pub struct Vec2 {
     pub y: f64,
 }
 
-
 #[table(name = player, public)]
 pub struct Player {
     #[primary_key]
@@ -41,7 +40,10 @@ pub struct Message {
 pub fn set_name(ctx: &ReducerContext, name: String) -> Result<(), String> {
     let name = validate_name(name)?;
     if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
-        ctx.db.user().identity().update(User { name: Some(name), ..user });
+        ctx.db.user().identity().update(User {
+            name: Some(name),
+            ..user
+        });
         Ok(())
     } else {
         Err("Cannot set name for unknown user".to_string())
@@ -63,7 +65,10 @@ pub fn set_avatar(ctx: &ReducerContext, avatar_url: String) -> Result<(), String
     let avatar_url = validate_avatar_url(avatar_url)?;
     log::info!("Validate avatar for user {:?}", avatar_url);
     if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
-        ctx.db.user().identity().update(User { avatar_url: Some(avatar_url), ..user });
+        ctx.db.user().identity().update(User {
+            avatar_url: Some(avatar_url),
+            ..user
+        });
         Ok(())
     } else {
         Err("Cannot set avatar for unknown user".to_string())
@@ -129,7 +134,10 @@ pub fn client_connected(ctx: &ReducerContext) {
     if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
         // If this is a returning user, i.e. we already have a `User` with this `Identity`,
         // set `online: true`, but leave `name` and `identity` unchanged.
-        ctx.db.user().identity().update(User { online: true, ..user });
+        ctx.db.user().identity().update(User {
+            online: true,
+            ..user
+        });
     } else {
         // If this is a new user, create a `User` row for the `Identity`,
         // which is online, but hasn't set a name or avatar.
@@ -146,11 +154,17 @@ pub fn client_connected(ctx: &ReducerContext) {
 // Called when a client disconnects from SpacetimeDB database server
 pub fn identity_disconnected(ctx: &ReducerContext) {
     if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
-        ctx.db.user().identity().update(User { online: false, ..user });
+        ctx.db.user().identity().update(User {
+            online: false,
+            ..user
+        });
     } else {
         // This branch should be unreachable,
         // as it doesn't make sense for a client to disconnect without connecting first.
-        log::warn!("Disconnect event for unknown user with identity {:?}", ctx.sender);
+        log::warn!(
+            "Disconnect event for unknown user with identity {:?}",
+            ctx.sender
+        );
     }
 }
 
@@ -166,10 +180,13 @@ pub fn move_player(ctx: &ReducerContext, x: f64, y: f64) {
 #[reducer]
 pub fn generate_dungeon_test(_ctx: &ReducerContext) {
     // Test that our refactored dungeon generation still works
-    let mut generator = dungeon_generation::MapGenerator::new(40, 30, 6, 6, 2);
+    let mut generator = dungeon_generation::MapGenerator::new(2, 2, 20, 20, 2); // 2x2 grid of rooms, each 20x20
     let _map = generator.generate();
 
     // This is just a test to verify the modules work - in a real game
     // you'd probably store the map data in a table
-    log::info!("Dungeon generated successfully with {} rooms", generator.rooms.len());
+    log::info!(
+        "Dungeon generated successfully with {} rooms",
+        generator.rooms.len()
+    );
 }
