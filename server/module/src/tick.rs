@@ -20,7 +20,7 @@ pub fn tick(ctx: &ReducerContext, schedule: GameTick) -> Result<(), String> {
     }
 
     let current_time = ctx.timestamp;
-    let last_tick_time = schedule.last_tick_time;
+    //let last_tick_time = schedule.last_tick_time;
 
     // Calculate deltaTime in seconds
     // let delta_time_micros =

@@ -48,8 +48,6 @@ import { MovePlayer } from "./move_player_reducer.ts";
 export { MovePlayer };
 import { SendMessage } from "./send_message_reducer.ts";
 export { SendMessage };
-import { SetAvatar } from "./set_avatar_reducer.ts";
-export { SetAvatar };
 import { SetName } from "./set_name_reducer.ts";
 export { SetName };
 import { Tick } from "./tick_reducer.ts";
@@ -155,10 +153,6 @@ const REMOTE_MODULE = {
       reducerName: "send_message",
       argsType: SendMessage.getTypeScriptAlgebraicType(),
     },
-    set_avatar: {
-      reducerName: "set_avatar",
-      argsType: SetAvatar.getTypeScriptAlgebraicType(),
-    },
     set_name: {
       reducerName: "set_name",
       argsType: SetName.getTypeScriptAlgebraicType(),
@@ -202,7 +196,6 @@ export type Reducer = never
 | { name: "IdentityDisconnected", args: IdentityDisconnected }
 | { name: "MovePlayer", args: MovePlayer }
 | { name: "SendMessage", args: SendMessage }
-| { name: "SetAvatar", args: SetAvatar }
 | { name: "SetName", args: SetName }
 | { name: "Tick", args: Tick }
 ;
@@ -310,22 +303,6 @@ export class RemoteReducers {
     this.connection.offReducer("send_message", callback);
   }
 
-  setAvatar(avatarUrl: string) {
-    const __args = { avatarUrl };
-    let __writer = new BinaryWriter(1024);
-    SetAvatar.getTypeScriptAlgebraicType().serialize(__writer, __args);
-    let __argsBuffer = __writer.getBuffer();
-    this.connection.callReducer("set_avatar", __argsBuffer, this.setCallReducerFlags.setAvatarFlags);
-  }
-
-  onSetAvatar(callback: (ctx: ReducerEventContext, avatarUrl: string) => void) {
-    this.connection.onReducer("set_avatar", callback);
-  }
-
-  removeOnSetAvatar(callback: (ctx: ReducerEventContext, avatarUrl: string) => void) {
-    this.connection.offReducer("set_avatar", callback);
-  }
-
   setName(name: string) {
     const __args = { name };
     let __writer = new BinaryWriter(1024);
@@ -389,11 +366,6 @@ export class SetReducerFlags {
   sendMessageFlags: CallReducerFlags = 'FullUpdate';
   sendMessage(flags: CallReducerFlags) {
     this.sendMessageFlags = flags;
-  }
-
-  setAvatarFlags: CallReducerFlags = 'FullUpdate';
-  setAvatar(flags: CallReducerFlags) {
-    this.setAvatarFlags = flags;
   }
 
   setNameFlags: CallReducerFlags = 'FullUpdate';

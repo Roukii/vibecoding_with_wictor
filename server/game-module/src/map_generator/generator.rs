@@ -107,18 +107,16 @@ impl Generator {
         seed: u64,
         params: GenerationParams,
     ) -> Result<MapGenerationResult, String> {
-        let start_time = std::time::Instant::now();
-
-        match map_type {
+        let mut result = match map_type {
             MapType::Dungeon => Self::generate_dungeon_map(name, seed, params.dungeon),
             MapType::Town => Self::generate_town_map(name, seed, params.town),
             MapType::Wilderness => Self::generate_wilderness_map(name, seed, params.wilderness),
             MapType::Instance => Err("Instance generation not yet implemented".to_string()),
-        }
-        .map(|mut result| {
-            result.metadata.generation_time_ms = Some(start_time.elapsed().as_millis() as u64);
-            result
-        })
+        }?;
+
+        // Set generation time to None since timing is not available in WASM
+        result.metadata.generation_time_ms = None;
+        Ok(result)
     }
 
     /// Convenience method for quick dungeon generation

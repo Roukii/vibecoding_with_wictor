@@ -33,7 +33,6 @@ import {
 export type User = {
   identity: Identity,
   name: string | undefined,
-  avatarUrl: string | undefined,
   online: boolean,
 };
 
@@ -49,7 +48,6 @@ export namespace User {
     return AlgebraicType.createProductType([
       new ProductTypeElement("identity", AlgebraicType.createIdentityType()),
       new ProductTypeElement("name", AlgebraicType.createOptionType(AlgebraicType.createStringType())),
-      new ProductTypeElement("avatarUrl", AlgebraicType.createOptionType(AlgebraicType.createStringType())),
       new ProductTypeElement("online", AlgebraicType.createBoolType()),
     ]);
   }

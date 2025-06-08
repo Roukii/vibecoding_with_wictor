@@ -35,7 +35,6 @@ pub struct User {
     #[primary_key]
     pub identity: Identity,
     pub name: Option<String>,
-    pub avatar_url: Option<String>,
     pub online: bool,
 }
 
