@@ -28,6 +28,17 @@ pub struct Player {
     pub identity: Identity,
     pub name: String,
     pub entity_id: Option<u64>,
+    pub current_map_id: Option<u64>, // The map the player is currently in
+}
+
+#[table(name = player_offline, public)]
+pub struct PlayerOffline {
+    #[primary_key]
+    pub identity: Identity,
+    pub name: String,
+    pub entity_id: Option<u64>,
+    pub current_map_id: Option<u64>, // The map the player was in when they went offline
+    pub last_seen: Timestamp,
 }
 
 #[table(name = user, public)]
@@ -36,6 +47,14 @@ pub struct User {
     pub identity: Identity,
     pub name: Option<String>,
     pub online: bool,
+}
+
+#[table(name = game_info, public)]
+pub struct GameInfo {
+    #[primary_key]
+    pub id: u64, // Using a constant ID (e.g., 1) for singleton pattern
+    pub starting_town_map_id: u64,
+    pub updated_at: Timestamp,
 }
 
 #[table(name = message, public)]

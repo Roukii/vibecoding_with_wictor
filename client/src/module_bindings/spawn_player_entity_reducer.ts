@@ -30,38 +30,29 @@ import {
   Timestamp,
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
-export type Player = {
-  identity: Identity,
-  name: string,
-  entityId: bigint | undefined,
-  currentMapId: bigint | undefined,
-};
+
+export type SpawnPlayerEntity = {};
 
 /**
  * A namespace for generated helper functions.
  */
-export namespace Player {
+export namespace SpawnPlayerEntity {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createProductType([
-      new ProductTypeElement("identity", AlgebraicType.createIdentityType()),
-      new ProductTypeElement("name", AlgebraicType.createStringType()),
-      new ProductTypeElement("entityId", AlgebraicType.createOptionType(AlgebraicType.createU64Type())),
-      new ProductTypeElement("currentMapId", AlgebraicType.createOptionType(AlgebraicType.createU64Type())),
     ]);
   }
 
-  export function serialize(writer: BinaryWriter, value: Player): void {
-    Player.getTypeScriptAlgebraicType().serialize(writer, value);
+  export function serialize(writer: BinaryWriter, value: SpawnPlayerEntity): void {
+    SpawnPlayerEntity.getTypeScriptAlgebraicType().serialize(writer, value);
   }
 
-  export function deserialize(reader: BinaryReader): Player {
-    return Player.getTypeScriptAlgebraicType().deserialize(reader);
+  export function deserialize(reader: BinaryReader): SpawnPlayerEntity {
+    return SpawnPlayerEntity.getTypeScriptAlgebraicType().deserialize(reader);
   }
 
 }
-
 

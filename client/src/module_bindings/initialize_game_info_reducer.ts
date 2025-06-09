@@ -30,38 +30,32 @@ import {
   Timestamp,
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
-export type Player = {
-  identity: Identity,
-  name: string,
-  entityId: bigint | undefined,
-  currentMapId: bigint | undefined,
+
+export type InitializeGameInfo = {
+  startingTownMapId: bigint,
 };
 
 /**
  * A namespace for generated helper functions.
  */
-export namespace Player {
+export namespace InitializeGameInfo {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createProductType([
-      new ProductTypeElement("identity", AlgebraicType.createIdentityType()),
-      new ProductTypeElement("name", AlgebraicType.createStringType()),
-      new ProductTypeElement("entityId", AlgebraicType.createOptionType(AlgebraicType.createU64Type())),
-      new ProductTypeElement("currentMapId", AlgebraicType.createOptionType(AlgebraicType.createU64Type())),
+      new ProductTypeElement("startingTownMapId", AlgebraicType.createU64Type()),
     ]);
   }
 
-  export function serialize(writer: BinaryWriter, value: Player): void {
-    Player.getTypeScriptAlgebraicType().serialize(writer, value);
+  export function serialize(writer: BinaryWriter, value: InitializeGameInfo): void {
+    InitializeGameInfo.getTypeScriptAlgebraicType().serialize(writer, value);
   }
 
-  export function deserialize(reader: BinaryReader): Player {
-    return Player.getTypeScriptAlgebraicType().deserialize(reader);
+  export function deserialize(reader: BinaryReader): InitializeGameInfo {
+    return InitializeGameInfo.getTypeScriptAlgebraicType().deserialize(reader);
   }
 
 }
-
 

@@ -1,416 +1,608 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import './App.css';
-import {
-  DbConnection,
-  type ErrorContext,
-  type EventContext,
-  Message,
-  User,
-} from './module_bindings';
-import { Identity, Timestamp } from '@clockworklabs/spacetimedb-sdk';
+import { DbConnection, Player, Map, Message, Entity, User } from './module_bindings';
 
-export type PrettyMessage = {
-  id: bigint;
-  sender: Identity;
-  senderName: string;
-  senderAvatar: string | null;
-  text: string;
-  sent: Timestamp;
-};
-
-function useMessages(conn: DbConnection | null): Message[] {
-  const [messages, setMessages] = useState<Message[]>([]);
-
-  useEffect(() => {
-    if (!conn) return;
-    const onInsert = (_ctx: EventContext, message: Message) => {
-      setMessages(prev => [...prev, message]);
-    };
-    conn.db.message.onInsert(onInsert);
-
-    const onDelete = (_ctx: EventContext, message: Message) => {
-      setMessages(prev =>
-        prev.filter(m => m.id !== message.id)
-      );
-    };
-    conn.db.message.onDelete(onDelete);
-
-    return () => {
-      conn.db.message.removeOnInsert(onInsert);
-      conn.db.message.removeOnDelete(onDelete);
-    };
-  }, [conn]);
-
-  return messages;
-}
-
-function useUsers(conn: DbConnection | null): Map<string, User> {
-  const [users, setUsers] = useState<Map<string, User>>(new Map());
-
-  useEffect(() => {
-    if (!conn) return;
-    const onInsert = (_ctx: EventContext, user: User) => {
-      setUsers(prev => new Map(prev.set(user.identity.toHexString(), user)));
-    };
-    conn.db.user.onInsert(onInsert);
-
-    const onUpdate = (_ctx: EventContext, oldUser: User, newUser: User) => {
-      setUsers(prev => {
-        prev.delete(oldUser.identity.toHexString());
-        return new Map(prev.set(newUser.identity.toHexString(), newUser));
-      });
-    };
-    conn.db.user.onUpdate(onUpdate);
-
-    const onDelete = (_ctx: EventContext, user: User) => {
-      setUsers(prev => {
-        prev.delete(user.identity.toHexString());
-        return new Map(prev);
-      });
-    };
-    conn.db.user.onDelete(onDelete);
-
-    return () => {
-      conn.db.user.removeOnInsert(onInsert);
-      conn.db.user.removeOnUpdate(onUpdate);
-      conn.db.user.removeOnDelete(onDelete);
-    };
-  }, [conn]);
-
-  return users;
-}
-
-// Generate a deterministic avatar based on identity
-function generateAvatarUrl(identity: string): string {
-  // Using DiceBear API for generated avatars based on seed
-  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${identity}`;
-}
-
-function UserAvatar({ user, size = 32 }: { user: User | undefined, size?: number }) {
-  const avatarUrl = user?.avatarUrl || generateAvatarUrl(user?.identity.toHexString() || 'default');
-  const userName = user?.name || user?.identity.toHexString().substring(0, 8) || 'Unknown';
-
-  return (
-    <img
-      src={avatarUrl}
-      alt={`${userName}'s avatar`}
-      style={{
-        width: size,
-        height: size,
-        borderRadius: '50%',
-        objectFit: 'cover',
-        marginRight: '8px',
-        border: '2px solid #ddd'
-      }}
-      onError={(e) => {
-        // Fallback to generated avatar if custom avatar fails to load
-        const target = e.target as HTMLImageElement;
-        target.src = generateAvatarUrl(user?.identity.toHexString() || 'default');
-      }}
-    />
-  );
+interface GameState {
+  connection: DbConnection | null;
+  isConnected: boolean;
+  currentUser: User | null;
+  currentPlayer: Player | null;
+  users: User[];
+  players: Player[];
+  maps: Map[];
+  currentMap: Map | null;
+  messages: Message[];
+  entities: Entity[];
 }
 
 function App() {
-  const [newName, setNewName] = useState('');
-  const [newAvatar, setNewAvatar] = useState('');
-  const [settingName, setSettingName] = useState(false);
-  const [settingAvatar, setSettingAvatar] = useState(false);
-  const [systemMessage, setSystemMessage] = useState('');
+  const [gameState, setGameState] = useState<GameState>({
+    connection: null,
+    isConnected: false,
+    currentUser: null,
+    currentPlayer: null,
+    users: [],
+    players: [],
+    maps: [],
+    currentMap: null,
+    messages: [],
+    entities: []
+  });
+
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [playerName, setPlayerName] = useState('');
   const [newMessage, setNewMessage] = useState('');
-  const [connected, setConnected] = useState<boolean>(false);
-  const [identity, setIdentity] = useState<Identity | null>(null);
-  const [conn, setConn] = useState<DbConnection | null>(null);
-  const [deletingMessages, setDeletingMessages] = useState<Set<bigint>>(new Set());
 
-  useEffect(() => {
-    const subscribeToQueries = (conn: DbConnection, queries: string[]) => {
-      conn
-        ?.subscriptionBuilder()
-        .onApplied(() => {
-          console.log('SDK client cache initialized.');
+  const connectToGame = useCallback(async () => {
+    if (isConnecting || gameState.isConnected) return;
+    
+    setIsConnecting(true);
+    setError(null);
+
+    try {
+      const connection = DbConnection.builder()
+        .withUri("ws://127.0.0.1:3000")
+        .withModuleName("quickstart-chat")
+        .onConnect((conn, identity) => {
+          setGameState(prev => ({ ...prev, isConnected: true }));
+
+          // Set up subscriptions AFTER connection is established
+          conn.subscriptionBuilder()
+            .onApplied(() => {
+              // Subscription applied - client cache initialized
+            })
+            .onError((ctx) => {
+              console.error('Subscription error:', ctx.event);
+            })
+            .subscribe([
+              'SELECT * FROM user',
+              'SELECT * FROM player',
+              'SELECT * FROM map', 
+              'SELECT * FROM message',
+              'SELECT * FROM entity'
+            ]);
+
+          // Listen for table updates AFTER connection is established
+          conn.db.user.onInsert((_, user) => {
+            setGameState(prev => {
+              const existingUserIndex = prev.users.findIndex(u => 
+                u.identity.isEqual(user.identity)
+              );
+              
+              let newUsers;
+              if (existingUserIndex >= 0) {
+                newUsers = [...prev.users];
+                newUsers[existingUserIndex] = user;
+              } else {
+                newUsers = [...prev.users, user];
+              }
+
+              // Check if this is the current user
+              let currentUser = prev.currentUser;
+              if (conn.identity && user.identity.isEqual(conn.identity)) {
+                currentUser = user;
+              }
+
+              return {
+                ...prev,
+                users: newUsers,
+                currentUser
+              };
+            });
+          });
+
+          conn.db.user.onUpdate((_, _oldUser, newUser) => {
+            setGameState(prev => {
+              const newUsers = prev.users.map(u => 
+                u.identity.isEqual(newUser.identity) ? newUser : u
+              );
+
+              let currentUser = prev.currentUser;
+              if (conn.identity && newUser.identity.isEqual(conn.identity)) {
+                currentUser = newUser;
+              }
+
+              return {
+                ...prev,
+                users: newUsers,
+                currentUser
+              };
+            });
+          });
+
+          conn.db.player.onInsert((_, player) => {
+            setGameState(prev => {
+              const existingPlayerIndex = prev.players.findIndex(p => 
+                p.identity.isEqual(player.identity)
+              );
+              
+              let newPlayers;
+              if (existingPlayerIndex >= 0) {
+                newPlayers = [...prev.players];
+                newPlayers[existingPlayerIndex] = player;
+              } else {
+                newPlayers = [...prev.players, player];
+              }
+
+              // Check if this is the current player
+              let currentPlayer = prev.currentPlayer;
+              if (conn.identity && player.identity.isEqual(conn.identity)) {
+                currentPlayer = player;
+              }
+
+              return {
+                ...prev,
+                players: newPlayers,
+                currentPlayer
+              };
+            });
+          });
+
+          conn.db.player.onUpdate((_, _oldPlayer, newPlayer) => {
+            setGameState(prev => {
+              const newPlayers = prev.players.map(p => 
+                p.identity.isEqual(newPlayer.identity) ? newPlayer : p
+              );
+
+              let currentPlayer = prev.currentPlayer;
+              if (conn.identity && newPlayer.identity.isEqual(conn.identity)) {
+                currentPlayer = newPlayer;
+              }
+
+              return {
+                ...prev,
+                players: newPlayers,
+                currentPlayer
+              };
+            });
+          });
+
+          conn.db.map.onInsert((_, map) => {
+            setGameState(prev => {
+              const newMaps = [...prev.maps, map];
+              let currentMap = prev.currentMap;
+              
+              // If no current map and this is the starting town, set it as current
+              if (!currentMap && map.isStartingTown) {
+                currentMap = map;
+              }
+              
+              return {
+                ...prev,
+                maps: newMaps,
+                currentMap
+              };
+            });
+          });
+
+          conn.db.message.onInsert((_, message) => {
+            setGameState(prev => {
+              // Check if message already exists to prevent duplicates
+              const existingMessage = prev.messages.find(m => 
+                m.id === message.id
+              );
+              
+              if (existingMessage) {
+                return prev; // Don't add duplicate
+              }
+              
+              return {
+                ...prev,
+                messages: [...prev.messages, message].slice(-100) // Keep last 100 messages
+              };
+            });
+          });
+
+          conn.db.message.onDelete((_, message) => {
+            setGameState(prev => ({
+              ...prev,
+              messages: prev.messages.filter(m => m.id !== message.id)
+            }));
+          });
+
+          conn.db.entity.onInsert((_, entity) => {
+            setGameState(prev => ({
+              ...prev,
+              entities: [...prev.entities, entity]
+            }));
+          });
+
+          conn.db.entity.onUpdate((_, _oldEntity, newEntity) => {
+            setGameState(prev => ({
+              ...prev,
+              entities: prev.entities.map(e => e.id === newEntity.id ? newEntity : e)
+            }));
+          });
+
+          conn.db.entity.onDelete((_, entity) => {
+            setGameState(prev => ({
+              ...prev,
+              entities: prev.entities.filter(e => e.id !== entity.id)
+            }));
+          });
         })
-        .subscribe(queries);
-    };
+        .onDisconnect(() => {
+          console.log('Disconnected from SpaceTimeDB');
+          setGameState({
+            connection: null,
+            isConnected: false,
+            currentUser: null,
+            currentPlayer: null,
+            users: [],
+            players: [],
+            maps: [],
+            currentMap: null,
+            messages: [],
+            entities: []
+          });
+        })
+        .onConnectError((ctx) => {
+          console.error('Connection error:', ctx.event);
+          setError(ctx.event?.message || 'Connection failed');
+        })
+        .build();
 
-    const onConnect = (
-      conn: DbConnection,
-      identity: Identity,
-      token: string
-    ) => {
-      setIdentity(identity);
-      setConnected(true);
-      localStorage.setItem('auth_token', token);
-      console.log(
-        'Connected to SpacetimeDB with identity:',
-        identity.toHexString()
-      );
-      conn.reducers.onSendMessage(() => {
-        console.log('Message sent.');
-      });
+      setGameState(prev => ({ ...prev, connection }));
 
-      conn.reducers.onDeleteMessage(() => {
-        console.log('Message deleted.');
-      });
+      // Create player entity after connection is established
+      // We'll do this in a separate effect that watches for connection state
 
-      conn.reducers.onSetAvatar(() => {
-        console.log('Avatar updated.');
-      });
+    } catch (err) {
+      console.error('Failed to connect:', err);
+      setError(err instanceof Error ? err.message : 'Connection failed');
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [isConnecting, gameState.isConnected]);
 
-      subscribeToQueries(conn, ['SELECT * FROM message', 'SELECT * FROM user']);
-    };
+  const setPlayerNameHandler = useCallback(async (name: string) => {
+    if (!gameState.connection || !gameState.isConnected) {
+      setError('Connection not ready. Please wait and try again.');
+      return;
+    }
+    
+    try {
+      await gameState.connection.reducers.setName(name);
+    } catch (err) {
+      console.error('Failed to set name:', err);
+      if (err instanceof Error && err.message.includes('CONNECTING')) {
+        setError('Connection not ready. Please wait and try again.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to set name');
+      }
+    }
+  }, [gameState.connection, gameState.isConnected, gameState.currentUser]);
 
-    const onDisconnect = () => {
-      console.log('Disconnected from SpacetimeDB');
-      setConnected(false);
-    };
+  const sendMessage = useCallback(async (text: string) => {
+    if (!gameState.connection || !gameState.isConnected) return;
+    
+    try {
+      await gameState.connection.reducers.sendMessage(text);
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      if (err instanceof Error && err.message.includes('CONNECTING')) {
+        console.warn('Cannot send message: Connection not ready');
+      }
+    }
+  }, [gameState.connection, gameState.isConnected]);
 
-    const onConnectError = (_ctx: ErrorContext, err: Error) => {
-      console.log('Error connecting to SpacetimeDB:', err);
-    };
+  const movePlayer = useCallback(async (x: number, y: number) => {
+    if (!gameState.connection || !gameState.isConnected) return;
+    
+    try {
+      await gameState.connection.reducers.movePlayer(x, y);
+    } catch (err) {
+      console.error('Failed to move player:', err);
+      if (err instanceof Error && err.message.includes('CONNECTING')) {
+        console.warn('Cannot move player: Connection not ready');
+      }
+    }
+  }, [gameState.connection, gameState.isConnected]);
 
-    setConn(
-      DbConnection.builder()
-        .withUri('ws://localhost:3000')
-        .withModuleName('quickstart-chat')
-        .withToken(localStorage.getItem('auth_token') || '')
-        .onConnect(onConnect)
-        .onDisconnect(onDisconnect)
-        .onConnectError(onConnectError)
-        .build()
-    );
-  }, []);
-
+  // Auto-connect on component mount
   useEffect(() => {
-    if (!conn) return;
-    conn.db.user.onInsert((_ctx, user) => {
-      if (user.online) {
-        const name = user.name || user.identity.toHexString().substring(0, 8);
-        setSystemMessage(prev => prev + `\n${name} has connected.`);
-      }
-    });
-    conn.db.user.onUpdate((_ctx, oldUser, newUser) => {
-      const name =
-        newUser.name || newUser.identity.toHexString().substring(0, 8);
-      if (oldUser.online === false && newUser.online === true) {
-        setSystemMessage(prev => prev + `\n${name} has connected.`);
-      } else if (oldUser.online === true && newUser.online === false) {
-        setSystemMessage(prev => prev + `\n${name} has disconnected.`);
-      }
-    });
-  }, [conn]);
+    connectToGame();
+  }, [connectToGame]);
 
-  const messages = useMessages(conn);
-  const users = useUsers(conn);
-
-  const prettyMessages: PrettyMessage[] = messages
-    .sort((a, b) => (a.sent > b.sent ? 1 : -1))
-    .map(message => {
-      const user = users.get(message.sender.toHexString());
-      return {
-        id: message.id,
-        sender: message.sender,
-        senderName: user?.name || message.sender.toHexString().substring(0, 8),
-        senderAvatar: user?.avatarUrl || null,
-        text: message.text,
-        sent: message.sent,
+  // Create player entity after connection is established
+  useEffect(() => {
+    if (gameState.isConnected && gameState.connection && !gameState.currentPlayer) {
+      const createPlayerEntity = async () => {
+        try {
+          await gameState.connection!.reducers.createPlayerEntity();
+        } catch (err) {
+          console.warn('Failed to create player entity:', err);
+        }
       };
-    });
+      
+      // Add a small delay to ensure connection is fully stable
+      const timer = setTimeout(createPlayerEntity, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [gameState.isConnected, gameState.connection, gameState.currentPlayer]);
 
-  if (!conn || !connected || !identity) {
+
+
+  if (!gameState.isConnected) {
     return (
-      <div className="App">
-        <h1>Connecting...</h1>
+      <div className="app">
+        <div className="connection-screen">
+          <div className="connection-container">
+            <h1>Multiplayer Game</h1>
+            <div className="connection-status">
+              {isConnecting && (
+                <>
+                  <div className="loading-spinner"></div>
+                  <p>Connecting to game server...</p>
+                </>
+              )}
+              
+              {error && (
+                <div className="connection-status error">
+                  <p>Connection failed: {error}</p>
+                  <button onClick={connectToGame} className="retry-button">
+                    Retry Connection
+                  </button>
+                </div>
+              )}
+              
+              {!isConnecting && !error && (
+                <div className="connection-status">
+                  <p>Not connected</p>
+                  <button onClick={connectToGame} className="retry-button">
+                    Connect
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
-  const currentUser = users.get(identity?.toHexString());
-  const name = currentUser?.name || identity?.toHexString().substring(0, 8) || '';
-
-  const onSubmitNewName = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setSettingName(false);
-    conn.reducers.setName(newName);
-  };
-
-  const onSubmitNewAvatar = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setSettingAvatar(false);
-    conn.reducers.setAvatar(newAvatar);
-  };
-
-  const onMessageSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setNewMessage('');
-    conn.reducers.sendMessage(newMessage);
-  };
-
-  const onDeleteMessage = async (messageId: bigint) => {
-    if (deletingMessages.has(messageId)) return;
-    
-    setDeletingMessages(prev => new Set(prev).add(messageId));
-    
-    try {
-      await conn.reducers.deleteMessage(messageId);
-    } catch (error) {
-      console.error('Failed to delete message:', error);
-      // Show error to user if needed
-    } finally {
-      setDeletingMessages(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(messageId);
-        return newSet;
-      });
-    }
-  };
-
-  const isOwnMessage = (message: PrettyMessage): boolean => {
-    return identity?.toHexString() === message.sender.toHexString();
-  };
+  if (!gameState.currentUser || !gameState.currentUser.name) {
+    return (
+      <div className="app">
+        <div className="setup-screen">
+          <div className="player-setup">
+            <div className="setup-container">
+              <h2>Welcome to the Game!</h2>
+              <p>Enter your name to start playing</p>
+              
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (playerName.trim()) {
+                    setPlayerNameHandler(playerName.trim());
+                  }
+                }} 
+                className="name-form"
+              >
+                <input
+                  type="text"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  placeholder="Enter your name"
+                  className="name-input"
+                  minLength={2}
+                  maxLength={20}
+                  required
+                />
+                <button 
+                  type="submit" 
+                  className="start-button"
+                  disabled={!playerName.trim()}
+                >
+                  Start Playing
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="App">
-      <div className="profile">
-        <h1>Profile</h1>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
-          <UserAvatar user={currentUser} size={64} />
-          <div>
-            <h3 style={{ margin: '0 0 5px 0' }}>{name}</h3>
-            <p style={{ margin: 0, fontSize: '0.8em', color: '#666' }}>
-              {identity?.toHexString().substring(0, 16)}...
-            </p>
+    <div className="app">
+      <div className="game-layout">
+        <div className="game-main">
+          <div className="game-view">
+            <div className="game-header">
+              <h2>{gameState.currentMap?.name || 'Loading Map...'}</h2>
+              <div className="player-info">
+                <span>Playing as: <strong>{gameState.currentUser?.name}</strong></span>
+                <span>Players online: {gameState.users.filter(u => u.online).length}</span>
+                <span>Maps available: {gameState.maps.length}</span>
+                <span>Entities: {gameState.entities.length}</span>
+              </div>
+            </div>
+
+            {gameState.currentMap ? (
+              <div className="map-container">
+                <div className="map-info">
+                  <p>Map: {gameState.currentMap.name} ({Number(gameState.currentMap.width)}x{Number(gameState.currentMap.height)})</p>
+                  <p>Type: {gameState.currentMap.mapType.tag}</p>
+                  <p>Starting Town: {gameState.currentMap.isStartingTown ? 'Yes' : 'No'}</p>
+                </div>
+                
+                <div className="map-visual">
+                  <div 
+                    className="map-grid"
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: `repeat(${Number(gameState.currentMap.width)}, 12px)`,
+                      gridTemplateRows: `repeat(${Number(gameState.currentMap.height)}, 12px)`,
+                      gap: '1px',
+                      background: '#333',
+                      padding: '4px',
+                      borderRadius: '4px',
+                      maxWidth: '400px',
+                      maxHeight: '400px',
+                      overflow: 'auto'
+                    }}
+                  >
+                    {Array.from({ length: Number(gameState.currentMap!.height) }, (_, y) =>
+                      Array.from({ length: Number(gameState.currentMap!.width) }, (_, x) => {
+                        const currentMap = gameState.currentMap!;
+                        const tileIndex = y * Number(currentMap.width) + x;
+                        const tileType = currentMap.tiles[tileIndex] || 0;
+                        
+                        // Check if there's a player at this position
+                        const playersAtPosition = gameState.entities.filter(entity => 
+                          entity.entityType.tag === 'Player' && 
+                          Math.floor(entity.position.x) === x && 
+                          Math.floor(entity.position.y) === y
+                        );
+                        
+                        // Check if current player is at this position
+                        const isCurrentPlayer = gameState.currentPlayer && 
+                          gameState.entities.some(entity => 
+                            entity.id === gameState.currentPlayer!.entityId &&
+                            Math.floor(entity.position.x) === x && 
+                            Math.floor(entity.position.y) === y
+                          );
+                        
+                        let tileColor = '#666'; // Wall (default)
+                        if (tileType === 1) tileColor = '#ddd'; // Floor
+                        if (tileType === 2) tileColor = '#8B4513'; // Door
+                        
+                        return (
+                          <div
+                            key={`${x}-${y}`}
+                            className="map-tile"
+                            style={{
+                              width: '12px',
+                              height: '12px',
+                              backgroundColor: playersAtPosition.length > 0 
+                                ? (isCurrentPlayer ? '#00ff00' : '#ff6b6b') 
+                                : tileColor,
+                              border: playersAtPosition.length > 0 ? '1px solid #fff' : 'none',
+                              cursor: tileType === 1 ? 'pointer' : 'default',
+                              position: 'relative'
+                            }}
+                            onClick={() => {
+                              if (tileType === 1) { // Only allow movement to floor tiles
+                                movePlayer(x, y);
+                              }
+                            }}
+                            title={`(${x}, ${y}) - ${
+                              tileType === 0 ? 'Wall' : 
+                              tileType === 1 ? 'Floor' : 
+                              tileType === 2 ? 'Door' : 'Unknown'
+                            }${playersAtPosition.length > 0 ? ` - ${playersAtPosition.length} player(s)` : ''}`}
+                          />
+                        );
+                      })
+                    ).flat()}
+                  </div>
+                  
+                  <div className="map-legend">
+                    <div className="legend-item">
+                      <div className="legend-color" style={{backgroundColor: '#ddd'}}></div>
+                      <span>Floor (walkable)</span>
+                    </div>
+                    <div className="legend-item">
+                      <div className="legend-color" style={{backgroundColor: '#666'}}></div>
+                      <span>Wall</span>
+                    </div>
+                    <div className="legend-item">
+                      <div className="legend-color" style={{backgroundColor: '#8B4513'}}></div>
+                      <span>Door</span>
+                    </div>
+                    <div className="legend-item">
+                      <div className="legend-color" style={{backgroundColor: '#00ff00'}}></div>
+                      <span>You</span>
+                    </div>
+                    <div className="legend-item">
+                      <div className="legend-color" style={{backgroundColor: '#ff6b6b'}}></div>
+                      <span>Other Players</span>
+                    </div>
+                  </div>
+                  
+                  <p className="map-instructions">Click on floor tiles to move your character</p>
+                </div>
+              </div>
+            ) : (
+              <div className="no-map">
+                <h3>Loading Map...</h3>
+                <p>Waiting for map data from server</p>
+              </div>
+            )}
           </div>
         </div>
         
-        {!settingName ? (
-          <div style={{ marginBottom: '10px' }}>
-            <button
-              onClick={() => {
-                setSettingName(true);
-                setNewName(name);
-              }}
-            >
-              Edit Name
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={onSubmitNewName} style={{ marginBottom: '10px' }}>
-            <input
-              type="text"
-              aria-label="name input"
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              placeholder="Enter your name"
-            />
-            <button type="submit">Save Name</button>
-            <button type="button" onClick={() => setSettingName(false)}>Cancel</button>
-          </form>
-        )}
-
-        {!settingAvatar ? (
-          <div>
-            <button
-              onClick={() => {
-                setSettingAvatar(true);
-                setNewAvatar(currentUser?.avatarUrl || '');
-              }}
-            >
-              Edit Avatar
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={onSubmitNewAvatar}>
-            <input
-              type="url"
-              aria-label="avatar URL input"
-              value={newAvatar}
-              onChange={e => setNewAvatar(e.target.value)}
-              placeholder="Enter avatar URL (https://...)"
-            />
-            <button type="submit">Save Avatar</button>
-            <button type="button" onClick={() => setSettingAvatar(false)}>Cancel</button>
-          </form>
-        )}
-      </div>
-
-      <div className="message">
-        <h1>Messages</h1>
-        {prettyMessages.length < 1 && <p>No messages</p>}
-        <div>
-          {prettyMessages.map((message) => {
-            const messageUser = users.get(message.sender.toHexString());
-            return (
-              <div key={message.id} style={{ 
-                border: '1px solid #ccc', 
-                margin: '10px 0', 
-                padding: '10px',
-                borderRadius: '5px',
-                position: 'relative'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start' }}>
-                    <UserAvatar user={messageUser} size={40} />
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: '0 0 5px 0' }}>
-                        <b>{message.senderName}</b>
-                        <span style={{ fontSize: '0.8em', color: '#666', marginLeft: '10px' }}>
-                          {message.sent.toDate().toLocaleDateString()}
-                        </span>
-                      </p>
-                      <p style={{ margin: '0' }}>{message.text}</p>
-                    </div>
-                  </div>
-                  {isOwnMessage(message) && (
-                    <button
-                      onClick={() => onDeleteMessage(message.id)}
-                      disabled={deletingMessages.has(message.id)}
-                      style={{
-                        backgroundColor: '#ff4444',
-                        color: 'white',
-                        border: 'none',
-                        padding: '5px 10px',
-                        borderRadius: '3px',
-                        cursor: deletingMessages.has(message.id) ? 'not-allowed' : 'pointer',
-                        fontSize: '0.8em',
-                        marginLeft: '10px'
-                      }}
+        <div className="game-sidebar">
+          <div className="chat">
+            <div className="chat-header">
+              <h3>Chat</h3>
+              <span className="player-count">{gameState.users.filter(u => u.online).length} players online</span>
+            </div>
+            
+            <div className="chat-messages">
+              {gameState.messages.length === 0 ? (
+                <p>No messages yet</p>
+              ) : (
+                gameState.messages.map((message) => {
+                  // Look for sender name in users first, then players
+                  const senderUser = gameState.users.find(u => 
+                    u.identity.isEqual(message.sender)
+                  );
+                  const senderPlayer = gameState.players.find(p => 
+                    p.identity.isEqual(message.sender)
+                  );
+                  const senderName = senderUser?.name || senderPlayer?.name || 
+                    message.sender.toHexString().substring(0, 8);
+                  const isOwnMessage = gameState.currentUser && message.sender.isEqual(gameState.currentUser.identity);
+                  
+                  return (
+                    <div
+                      key={message.id.toString()}
+                      className={`message ${isOwnMessage ? 'own-message' : ''}`}
                     >
-                      {deletingMessages.has(message.id) ? 'Deleting...' : 'Delete'}
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+                      <div className="message-header">
+                        <span className="sender-name">{senderName}</span>
+                        <span className="message-time">
+                          {message.sent.toDate().toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <div className="message-text">{message.text}</div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
 
-      <div className="system" style={{ whiteSpace: 'pre-wrap' }}>
-        <h1>System</h1>
-        <div>
-          <p>{systemMessage}</p>
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (newMessage.trim()) {
+                  sendMessage(newMessage.trim());
+                  setNewMessage('');
+                }
+              }} 
+              className="chat-input"
+            >
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type a message..."
+                className="message-input"
+                maxLength={500}
+              />
+              <button
+                type="submit"
+                className="send-button"
+                disabled={!newMessage.trim()}
+              >
+                Send
+              </button>
+            </form>
+          </div>
         </div>
-      </div>
-
-      <div className="new-message">
-        <form
-          onSubmit={onMessageSubmit}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            width: '50%',
-            margin: '0 auto',
-          }}
-        >
-          <h3>New Message</h3>
-          <textarea
-            aria-label="message input"
-            value={newMessage}
-            onChange={e => setNewMessage(e.target.value)}
-          ></textarea>
-          <button type="submit">Send</button>
-        </form>
       </div>
     </div>
   );

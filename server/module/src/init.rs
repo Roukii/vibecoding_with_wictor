@@ -1,4 +1,4 @@
-use crate::tables::{map, Map, MapType};
+use crate::tables::{game_info, map, GameInfo, Map, MapType};
 use crate::types::Vec2;
 use game_module::map_generator;
 use spacetimedb::{reducer, ReducerContext, Table};
@@ -6,7 +6,57 @@ use spacetimedb::{reducer, ReducerContext, Table};
 #[reducer(init)]
 pub fn init(ctx: &ReducerContext) {
     // Called when the module is initially published
-    // Generate a starting town where all players will spawn
+    log::info!("Initializing game world...");
+
+    // Generate the starting town and get its ID
+    let starting_town_id = match generate_starting_town(ctx) {
+        Some(id) => id,
+        None => {
+            log::error!("Failed to generate starting town");
+            return;
+        }
+    };
+
+    // Generate exploration dungeon
+    generate_exploration_dungeon(ctx);
+
+    // Initialize game info with the starting town
+    if let Err(e) = initialize_game_info(ctx, starting_town_id) {
+        log::error!("Failed to initialize game info: {}", e);
+        return;
+    }
+
+    // Initialize other game systems
+    initialize_game_systems(ctx);
+
+    log::info!("Game world initialization complete!");
+}
+
+/// Initialize game info with starting town
+fn initialize_game_info(ctx: &ReducerContext, starting_town_map_id: u64) -> Result<(), String> {
+    // Check if game info already exists
+    if ctx.db.game_info().id().find(1).is_some() {
+        log::info!("Game info already initialized");
+        return Ok(());
+    }
+
+    // Create the game info record
+    let game_info = GameInfo {
+        id: 1, // Singleton pattern - always use ID 1
+        starting_town_map_id,
+        updated_at: ctx.timestamp,
+    };
+
+    ctx.db.game_info().insert(game_info);
+    log::info!(
+        "Game info initialized with starting town map ID: {}",
+        starting_town_map_id
+    );
+    Ok(())
+}
+
+/// Generate the starting town and return its ID
+fn generate_starting_town(ctx: &ReducerContext) -> Option<u64> {
     let town_result = map_generator::Generator::generate_town(
         "Starting Town".to_string(),
         42,   // Fixed seed for consistent starting town
@@ -21,7 +71,7 @@ pub fn init(ctx: &ReducerContext) {
         Ok(result) => result,
         Err(e) => {
             log::error!("{}", e);
-            return;
+            return None;
         }
     };
 
@@ -55,14 +105,38 @@ pub fn init(ctx: &ReducerContext) {
         created_at: ctx.timestamp,
     };
 
+    // Insert and find the town to get its actual ID
     ctx.db.map().insert(town);
 
-    // Also generate a small dungeon for exploration
+    // Find the town we just inserted to get its ID
+    let town_id = ctx
+        .db
+        .map()
+        .iter()
+        .filter(|m| m.map_type == MapType::Town && m.is_starting_town)
+        .max_by_key(|t| t.created_at)
+        .map(|t| t.id);
+
+    log::info!(
+        "Starting town generated: {} areas, size {}x{}, {} spawn points (seed: {}, generation time: {}ms)",
+        town_result.metadata.room_count,
+        town_result.width,
+        town_result.height,
+        town_result.spawn_points.len(),
+        town_result.metadata.seed,
+        town_result.metadata.generation_time_ms.unwrap_or(0)
+    );
+
+    town_id
+}
+
+/// Generate exploration dungeon
+fn generate_exploration_dungeon(ctx: &ReducerContext) {
     let dungeon_result = map_generator::Generator::generate_dungeon(
         "Exploration Dungeon".to_string(),
         123, // Different seed for dungeon
-        10,   // 3x3 grid of rooms
-        10,   // rooms height
+        10,  // 3x3 grid of rooms
+        10,  // rooms height
         20,  // room width
         20,  // room height
     )
@@ -108,15 +182,6 @@ pub fn init(ctx: &ReducerContext) {
     ctx.db.map().insert(dungeon);
 
     log::info!(
-        "Starting town generated: {} areas, size {}x{}, {} spawn points (seed: {}, generation time: {}ms)",
-        town_result.metadata.room_count,
-        town_result.width,
-        town_result.height,
-        town_result.spawn_points.len(),
-        town_result.metadata.seed,
-        town_result.metadata.generation_time_ms.unwrap_or(0)
-    );
-    log::info!(
         "Exploration dungeon generated: {} rooms, size {}x{} (seed: {}, generation time: {}ms)",
         dungeon_result.metadata.room_count,
         dungeon_result.width,
@@ -124,7 +189,10 @@ pub fn init(ctx: &ReducerContext) {
         dungeon_result.metadata.seed,
         dungeon_result.metadata.generation_time_ms.unwrap_or(0)
     );
+}
 
+/// Initialize game systems
+fn initialize_game_systems(ctx: &ReducerContext) {
     // Initialize the tick system to run continuously
     match crate::tick::initialize_tick_system(ctx) {
         Ok(()) => log::info!("Tick system initialized successfully"),

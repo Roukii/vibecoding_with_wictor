@@ -44,18 +44,24 @@ import { GetStartingTown } from "./get_starting_town_reducer.ts";
 export { GetStartingTown };
 import { IdentityDisconnected } from "./identity_disconnected_reducer.ts";
 export { IdentityDisconnected };
+import { InitializeGameInfo } from "./initialize_game_info_reducer.ts";
+export { InitializeGameInfo };
 import { MovePlayer } from "./move_player_reducer.ts";
 export { MovePlayer };
 import { SendMessage } from "./send_message_reducer.ts";
 export { SendMessage };
 import { SetName } from "./set_name_reducer.ts";
 export { SetName };
+import { SpawnPlayerEntity } from "./spawn_player_entity_reducer.ts";
+export { SpawnPlayerEntity };
 import { Tick } from "./tick_reducer.ts";
 export { Tick };
 
 // Import and reexport all table handle types
 import { EntityTableHandle } from "./entity_table.ts";
 export { EntityTableHandle };
+import { GameInfoTableHandle } from "./game_info_table.ts";
+export { GameInfoTableHandle };
 import { GameTickTableHandle } from "./game_tick_table.ts";
 export { GameTickTableHandle };
 import { MapTableHandle } from "./map_table.ts";
@@ -64,6 +70,8 @@ import { MessageTableHandle } from "./message_table.ts";
 export { MessageTableHandle };
 import { PlayerTableHandle } from "./player_table.ts";
 export { PlayerTableHandle };
+import { PlayerOfflineTableHandle } from "./player_offline_table.ts";
+export { PlayerOfflineTableHandle };
 import { UserTableHandle } from "./user_table.ts";
 export { UserTableHandle };
 
@@ -72,6 +80,8 @@ import { Entity } from "./entity_type.ts";
 export { Entity };
 import { EntityType } from "./entity_type_type.ts";
 export { EntityType };
+import { GameInfo } from "./game_info_type.ts";
+export { GameInfo };
 import { GameTick } from "./game_tick_type.ts";
 export { GameTick };
 import { Map } from "./map_type.ts";
@@ -82,6 +92,8 @@ import { Message } from "./message_type.ts";
 export { Message };
 import { Player } from "./player_type.ts";
 export { Player };
+import { PlayerOffline } from "./player_offline_type.ts";
+export { PlayerOffline };
 import { User } from "./user_type.ts";
 export { User };
 import { Vec2 } from "./vec_2_type.ts";
@@ -92,6 +104,11 @@ const REMOTE_MODULE = {
     entity: {
       tableName: "entity",
       rowType: Entity.getTypeScriptAlgebraicType(),
+      primaryKey: "id",
+    },
+    game_info: {
+      tableName: "game_info",
+      rowType: GameInfo.getTypeScriptAlgebraicType(),
       primaryKey: "id",
     },
     game_tick: {
@@ -112,6 +129,11 @@ const REMOTE_MODULE = {
     player: {
       tableName: "player",
       rowType: Player.getTypeScriptAlgebraicType(),
+      primaryKey: "identity",
+    },
+    player_offline: {
+      tableName: "player_offline",
+      rowType: PlayerOffline.getTypeScriptAlgebraicType(),
       primaryKey: "identity",
     },
     user: {
@@ -145,6 +167,10 @@ const REMOTE_MODULE = {
       reducerName: "identity_disconnected",
       argsType: IdentityDisconnected.getTypeScriptAlgebraicType(),
     },
+    initialize_game_info: {
+      reducerName: "initialize_game_info",
+      argsType: InitializeGameInfo.getTypeScriptAlgebraicType(),
+    },
     move_player: {
       reducerName: "move_player",
       argsType: MovePlayer.getTypeScriptAlgebraicType(),
@@ -156,6 +182,10 @@ const REMOTE_MODULE = {
     set_name: {
       reducerName: "set_name",
       argsType: SetName.getTypeScriptAlgebraicType(),
+    },
+    spawn_player_entity: {
+      reducerName: "spawn_player_entity",
+      argsType: SpawnPlayerEntity.getTypeScriptAlgebraicType(),
     },
     tick: {
       reducerName: "tick",
@@ -194,9 +224,11 @@ export type Reducer = never
 | { name: "GetLatestDungeon", args: GetLatestDungeon }
 | { name: "GetStartingTown", args: GetStartingTown }
 | { name: "IdentityDisconnected", args: IdentityDisconnected }
+| { name: "InitializeGameInfo", args: InitializeGameInfo }
 | { name: "MovePlayer", args: MovePlayer }
 | { name: "SendMessage", args: SendMessage }
 | { name: "SetName", args: SetName }
+| { name: "SpawnPlayerEntity", args: SpawnPlayerEntity }
 | { name: "Tick", args: Tick }
 ;
 
@@ -271,6 +303,22 @@ export class RemoteReducers {
     this.connection.offReducer("identity_disconnected", callback);
   }
 
+  initializeGameInfo(startingTownMapId: bigint) {
+    const __args = { startingTownMapId };
+    let __writer = new BinaryWriter(1024);
+    InitializeGameInfo.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("initialize_game_info", __argsBuffer, this.setCallReducerFlags.initializeGameInfoFlags);
+  }
+
+  onInitializeGameInfo(callback: (ctx: ReducerEventContext, startingTownMapId: bigint) => void) {
+    this.connection.onReducer("initialize_game_info", callback);
+  }
+
+  removeOnInitializeGameInfo(callback: (ctx: ReducerEventContext, startingTownMapId: bigint) => void) {
+    this.connection.offReducer("initialize_game_info", callback);
+  }
+
   movePlayer(x: number, y: number) {
     const __args = { x, y };
     let __writer = new BinaryWriter(1024);
@@ -319,6 +367,18 @@ export class RemoteReducers {
     this.connection.offReducer("set_name", callback);
   }
 
+  spawnPlayerEntity() {
+    this.connection.callReducer("spawn_player_entity", new Uint8Array(0), this.setCallReducerFlags.spawnPlayerEntityFlags);
+  }
+
+  onSpawnPlayerEntity(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("spawn_player_entity", callback);
+  }
+
+  removeOnSpawnPlayerEntity(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("spawn_player_entity", callback);
+  }
+
   tick(schedule: GameTick) {
     const __args = { schedule };
     let __writer = new BinaryWriter(1024);
@@ -358,6 +418,11 @@ export class SetReducerFlags {
     this.getStartingTownFlags = flags;
   }
 
+  initializeGameInfoFlags: CallReducerFlags = 'FullUpdate';
+  initializeGameInfo(flags: CallReducerFlags) {
+    this.initializeGameInfoFlags = flags;
+  }
+
   movePlayerFlags: CallReducerFlags = 'FullUpdate';
   movePlayer(flags: CallReducerFlags) {
     this.movePlayerFlags = flags;
@@ -371,6 +436,11 @@ export class SetReducerFlags {
   setNameFlags: CallReducerFlags = 'FullUpdate';
   setName(flags: CallReducerFlags) {
     this.setNameFlags = flags;
+  }
+
+  spawnPlayerEntityFlags: CallReducerFlags = 'FullUpdate';
+  spawnPlayerEntity(flags: CallReducerFlags) {
+    this.spawnPlayerEntityFlags = flags;
   }
 
   tickFlags: CallReducerFlags = 'FullUpdate';
@@ -387,6 +457,10 @@ export class RemoteTables {
     return new EntityTableHandle(this.connection.clientCache.getOrCreateTable<Entity>(REMOTE_MODULE.tables.entity));
   }
 
+  get gameInfo(): GameInfoTableHandle {
+    return new GameInfoTableHandle(this.connection.clientCache.getOrCreateTable<GameInfo>(REMOTE_MODULE.tables.game_info));
+  }
+
   get gameTick(): GameTickTableHandle {
     return new GameTickTableHandle(this.connection.clientCache.getOrCreateTable<GameTick>(REMOTE_MODULE.tables.game_tick));
   }
@@ -401,6 +475,10 @@ export class RemoteTables {
 
   get player(): PlayerTableHandle {
     return new PlayerTableHandle(this.connection.clientCache.getOrCreateTable<Player>(REMOTE_MODULE.tables.player));
+  }
+
+  get playerOffline(): PlayerOfflineTableHandle {
+    return new PlayerOfflineTableHandle(this.connection.clientCache.getOrCreateTable<PlayerOffline>(REMOTE_MODULE.tables.player_offline));
   }
 
   get user(): UserTableHandle {
